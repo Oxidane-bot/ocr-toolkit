@@ -1,0 +1,100 @@
+[project]
+name = "ocr-cli"
+version = "0.2.0"
+description = "Fast document to Markdown converter with MarkItDown and OCR support"
+authors = [{name = "OCR Toolkit Team", email = "contact@example.com"}]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.12.0"
+keywords = ["document-conversion", "markdown", "ocr", "markitdown", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop", 
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing",
+    "Topic :: Utilities",
+]
+
+dependencies = [
+    # MarkItDown - Primary document conversion engine
+    "markitdown[all]>=0.1.2",
+    # Office document conversion support
+    "docx2pdf>=0.1.8",
+    "pywin32>=311; sys_platform == 'win32'",
+    # OCR support (for scanned documents)
+    "torch>=2.7.0",
+    "torchvision>=0.18.0",
+    "python-doctr[torch]",
+    "ocrmypdf",
+    "pdf2image",
+    "numpy",
+    "opencv-python",
+    "scikit-image",
+    # Core utilities
+    "tqdm",
+    "psutil>=7.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0", 
+    "pytest-mock>=3.10.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+ocr-convert = "ocr_toolkit.cli.convert:main"
+ocr-extract = "ocr_toolkit.cli.extract:main"
+ocr-search = "ocr_toolkit.cli.search:main"
+ocr-bench = "ocr_toolkit.cli.benchmark:main"
+
+[project.urls]
+Homepage = "https://github.com/USER/ocr-toolkit"
+Repository = "https://github.com/USER/ocr-toolkit.git"
+Issues = "https://github.com/USER/ocr-toolkit/issues"
+
+[tool.uv]
+extra-index-url = ["https://download.pytorch.org/whl/cu128"]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "pytest-mock>=3.14.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ocr_toolkit*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
