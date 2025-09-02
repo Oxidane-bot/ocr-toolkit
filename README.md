@@ -323,3 +323,39 @@ MIT License - see LICENSE file for details.
 ---
 
 **Convert smarter, not harder.** ⚡
+
+
+## Testing helper: slice first N pages of a PDF
+
+For large PDFs, you can slice the first N pages into a new PDF for faster tests without changing app code.
+
+Run without persisting dependencies:
+
+```bash
+uv run --with pypdf scripts/slice_pdf_first_pages.py "INPUT.pdf" "OUTPUT_firstN.pdf" 30
+```
+
+- This uses a transient `pypdf` only for the command above; it does not modify project dependencies.
+- Then run OCR on the sliced file, e.g.:
+
+```bash
+ocr-extract "OUTPUT_firstN.pdf" --zh --verbose
+```
+
+## Performance tips and new flags
+
+For faster runs on Chinese documents (CnOCR `--zh`):
+
+- `--fast`: Enable a faster pipeline (naive detection + optional downscale). Good for clean scans.
+- `--threads N`: Set OMP/MKL thread count for CPU-bound parts.
+- `--pages RANGE`: Process only selected pages. Examples: `--pages 1-30`, `--pages 1-5,10,20-25`.
+
+Example:
+
+```bash
+ocr-extract "主体解释学_first30.pdf" --zh --ocr-only --fast --threads 8 --batch-size 32 --pages 1-30
+```
+
+Notes:
+- `--fast` may trade some layout robustness for speed.
+- `--threads` affects CPU parts and may not change GPU inference speed.

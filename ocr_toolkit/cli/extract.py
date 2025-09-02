@@ -8,11 +8,11 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from ..utils import discover_files, load_ocr_model, add_common_ocr_args, add_output_args
-from ..processors import OCRProcessor, MarkItDownProcessor
-from .. import config, dual_processor
+from ..processors import OCRProcessor
+from .. import config, ocr_processor_wrapper
 
 
 def setup_logging():
@@ -58,6 +58,12 @@ def create_parser():
     return parser
 
 
+def _apply_threads_env(threads: Optional[int]) -> None:
+    if threads and threads > 0:
+        os.environ["OMP_NUM_THREADS"] = str(threads)
+        os.environ["MKL_NUM_THREADS"] = str(threads)
+
+
 def main():
     """Main entry point for ocr-extract command."""
     setup_logging()
@@ -76,13 +82,30 @@ def main():
         logging.getLogger().setLevel(logging.DEBUG)
     else:
         logging.getLogger().setLevel(logging.INFO)
+
+    # Auto defaults for Chinese (CnOCR) mode: threads=8, batch_size=32 unless explicitly overridden
+    if getattr(args, 'zh', False):
+        # If user didn't pass threads, default to 8
+        if args.threads is None:
+            args.threads = 8
+            logging.debug("Defaulting threads to 8 for --zh mode")
+        # If batch_size is still the global default, bump to 32
+        try:
+            if args.batch_size == config.DEFAULT_BATCH_SIZE:
+                args.batch_size = 32
+                logging.debug("Defaulting batch_size to 32 for --zh mode")
+        except Exception:
+            pass
+    
+    # Apply thread env overrides early
+    _apply_threads_env(args.threads)
     
     try:
         # Load OCR model (always needed for dual processing or OCR-only)
-        if not args.markitdown_only:
+        # Load doctr model only if not in markitdown-only mode AND not in Chinese mode
+        model = None
+        if not args.markitdown_only and not getattr(args, 'zh', False):
             model = load_ocr_model(args.det_arch, args.reco_arch, args.cpu)
-        else:
-            model = None
         
         # Discover supported files
         files, base_dir = discover_files(args.input_path)
@@ -97,14 +120,18 @@ def main():
         
         # Initialize processor based on mode
         if args.markitdown_only:
-            processor = MarkItDownProcessor()
-            processing_mode = "MarkItDown only"
+            processor = OCRProcessor(model, args.batch_size, use_cnocr=args.zh)
+            processing_mode = "OCR only" + (" with CnOCR" if args.zh else "")
         elif args.ocr_only:
-            processor = OCRProcessor(model, args.batch_size)
-            processing_mode = "OCR only"
+            processor = OCRProcessor(model, args.batch_size, use_cnocr=args.zh)
+            processing_mode = "OCR only" + (" with CnOCR" if args.zh else "")
         else:
-            processor = dual_processor.create_dual_processor(model, args.batch_size)
-            processing_mode = "Intelligent dual-path (MarkItDown + OCR)"
+            processor = ocr_processor_wrapper.create_ocr_processor_wrapper(model, args.batch_size, use_zh=args.zh)
+            processing_mode = "Intelligent OCR processing" + (" with CnOCR" if args.zh else "")
+        if args.fast:
+            processing_mode += " (fast)"
+        if args.profile:
+            processing_mode += " [profile]"
         
         # Process files
         total_files = len(files)
@@ -121,7 +148,7 @@ def main():
                 
                 # Process based on selected mode
                 if args.markitdown_only or args.ocr_only:
-                    result = processor.process(file_path)
+                    result = processor.process(file_path, fast=args.fast, pages=args.pages, profile=args.profile)
                     # Convert ProcessingResult to dict for compatibility
                     result_dict = {
                         'success': result.success,
@@ -133,7 +160,7 @@ def main():
                     }
                 else:
                     # Dual processing - use legacy interface
-                    result_dict = processor.process_document_dual(file_path, args)
+                    result_dict = processor.process_document(file_path, args)
                 
                 total_processing_time += result_dict.get('processing_time', 0)
                 

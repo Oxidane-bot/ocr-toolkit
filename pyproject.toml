@@ -20,8 +20,6 @@ classifiers = [
 ]
 
 dependencies = [
-    # MarkItDown - Primary document conversion engine
-    "markitdown[all]>=0.1.2",
     # Office document conversion support
     "docx2pdf>=0.1.8",
     "pywin32>=311; sys_platform == 'win32'",
@@ -31,12 +29,18 @@ dependencies = [
     "python-doctr[torch]",
     "ocrmypdf",
     "pdf2image",
-    "numpy",
-    "opencv-python",
+    # Use NumPy 1.x for compatibility with python-doctr 1.0.0
+    "numpy>=1.24.0,<2.0.0",
     "scikit-image",
     # Core utilities
     "tqdm",
     "psutil>=7.0.0",
+    # Use OpenCV version compatible with NumPy 1.x
+    "opencv-python>=4.8.0,<4.9.0",
+    "easyocr>=1.7.2",
+    # Prefer GPU ONNX Runtime only (pin to 1.20.x)
+    "onnxruntime-gpu>=1.20.0,<1.21.0",
+            "cnocr[ort-gpu]>=2.3.2.1",
 ]
 
 [project.optional-dependencies]

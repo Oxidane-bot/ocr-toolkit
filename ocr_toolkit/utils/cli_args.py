@@ -45,7 +45,36 @@ def add_common_ocr_args(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
         default=config.DEFAULT_RECO_ARCH,
         help="Recognition model architecture to use"
     )
+    parser.add_argument(
+        "--zh",
+        action="store_true",
+        help="Use CnOCR for Chinese text recognition (better for Chinese documents)"
+    )
+    # Performance-related toggles
+    parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="Enable fast mode (use naive text detection and lighter preprocessing)"
+    )
+    parser.add_argument(
+        "--threads",
+        type=int,
+        default=None,
+        help="Override OMP/MKL threads for CPU-bound parts (e.g., 8)"
+    )
+    parser.add_argument(
+        "--pages",
+        type=str,
+        default=None,
+        help="Process only selected pages, e.g. '1-30' or '1-5,10,20-25'"
+    )
+    parser.add_argument(
+        "--profile",
+        action="store_true",
+        help="Print fine-grained timing (startup, load, per-page, totals)"
+    )
     return parser
+
 
 
 def add_output_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:

@@ -8,6 +8,8 @@ the FileProcessorBase interface for consistent behavior.
 import os
 import time
 import logging
+import shutil
+import tempfile
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
@@ -26,18 +28,60 @@ class OCRProcessor(FileProcessorBase):
     with proper temporary file management and error handling.
     """
     
-    def __init__(self, ocr_model, batch_size: int = 16):
+    def __init__(self, ocr_model, batch_size: int = 16, use_cnocr: bool = False):
         """
         Initialize OCR processor.
         
         Args:
             ocr_model: Loaded DocTR OCR model
             batch_size: Number of pages to process in each batch
+            use_cnocr: Whether to use CnOCR for Chinese text recognition (better for Chinese documents)
         """
         super().__init__()
         self.ocr_model = ocr_model
         self.batch_size = batch_size
         self.office_converter = get_office_converter()
+        self.use_cnocr = use_cnocr
+        self.logger = logging.getLogger(__name__)
+        
+        # Initialize CnOCR if requested
+        if use_cnocr:
+            try:
+                from cnocr import CnOcr
+                import os
+                
+                # Clear font path environment variable to avoid issues
+                if 'FONTPATH' in os.environ:
+                    del os.environ['FONTPATH']
+                
+                # Let CnOCR use default configuration and auto-select backend
+                self.cnocr = CnOcr()
+                
+                # Debug: Check which backend CnOCR is actually using
+                try:
+                    import onnxruntime as ort
+                    providers = ort.get_available_providers()
+                    self.logger.info(f"CnOCR: Available providers: {providers}")
+                    
+                    # Check if CUDA is being used
+                    if hasattr(self.cnocr, 'det_model') and hasattr(self.cnocr.det_model, 'session'):
+                        det_providers = self.cnocr.det_model.session.get_providers()
+                        self.logger.info(f"CnOCR: Detection model providers: {det_providers}")
+                    
+                    if hasattr(self.cnocr, 'rec_model') and hasattr(self.cnocr.rec_model, 'session'):
+                        rec_providers = self.cnocr.rec_model.session.get_providers()
+                        self.logger.info(f"CnOCR: Recognition model providers: {rec_providers}")
+                        
+                except Exception as e:
+                    self.logger.debug(f"Could not check CnOCR backend: {e}")
+                
+                self.logger.info("CnOCR initialized successfully for Chinese text recognition")
+            except ImportError as e:
+                self.logger.warning("CnOCR not available, falling back to DocTR")
+                self.use_cnocr = False
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize CnOCR: {e}, falling back to DocTR")
+                self.use_cnocr = False
     
     def get_supported_formats(self) -> List[str]:
         """Get list of supported file formats for OCR processing."""
@@ -87,8 +131,12 @@ class OCRProcessor(FileProcessorBase):
                 result.processing_time = time.time() - start_time
                 return result
             
-            # Process with OCR
-            content = self._process_with_ocr(doc, file_path, ext)
+            # Process with OCR (choose between CnOCR and DocTR)
+            # CnOCR can handle both images and PDFs, so use it for all supported formats when requested
+            if self.use_cnocr and ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif', '.pdf']:
+                content = self._process_with_cnocr(doc, file_path, ext)
+            else:
+                content = self._process_with_ocr(doc, file_path, ext)
             
             result.content = content
             result.success = True
@@ -119,21 +167,24 @@ class OCRProcessor(FileProcessorBase):
             DocumentFile object or None if loading failed
         """
         try:
+            # Handle Chinese path encoding issues on Windows
+            normalized_path = self._normalize_file_path(file_path, result)
+            
             if ext == '.pdf':
                 # Direct PDF processing
-                doc = DocumentFile.from_pdf(file_path)
+                doc = DocumentFile.from_pdf(normalized_path)
                 self.logger.debug(f"OCR loaded PDF with {len(doc)} pages")
                 return doc
                 
             elif ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif']:
                 # Direct image processing
-                doc = DocumentFile.from_images([file_path])
+                doc = DocumentFile.from_images([normalized_path])
                 self.logger.debug(f"OCR loaded image for processing")
                 return doc
                 
             elif ext in ['.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx']:
                 # Office document - convert to PDF first
-                temp_pdf = self.office_converter.create_temp_pdf(file_path)
+                temp_pdf = self.office_converter.create_temp_pdf(normalized_path)
                 if temp_pdf:
                     result.temp_files.append(temp_pdf)
                     doc = DocumentFile.from_pdf(temp_pdf)
@@ -179,5 +230,189 @@ class OCRProcessor(FileProcessorBase):
                 else:
                     # For multi-page documents, use page numbers
                     markdown_content.append(f"## Page {current_page_number}\n\n{text}")
+        
+        return "\n\n".join(markdown_content)
+    
+    def _normalize_file_path(self, file_path: str, result: ProcessingResult) -> str:
+        """
+        Normalize file path to handle Chinese characters and encoding issues on Windows.
+        
+        Args:
+            file_path: Original file path
+            result: ProcessingResult object to add temp files to
+            
+        Returns:
+            Normalized file path that can be safely used with OpenCV and other libraries
+        """
+        try:
+            import os
+            from pathlib import Path
+            
+            # Convert to Path object for better handling
+            path_obj = Path(file_path)
+            
+            # Check if file exists
+            if not path_obj.exists():
+                self.logger.warning(f"File does not exist: {file_path}")
+                return file_path
+            
+            # On Windows, check if path contains non-ASCII characters
+            if os.name == 'nt':  # Windows
+                # Check if path contains Chinese or other non-ASCII characters
+                has_non_ascii = any(ord(char) > 127 for char in file_path)
+                
+                if has_non_ascii:
+                    self.logger.info(f"Detected non-ASCII characters in path, creating temporary copy")
+                    try:
+                        # Create a temporary file with ASCII name
+                        temp_dir = tempfile.gettempdir()
+                        temp_name = f"ocr_temp_{hash(file_path) % 10000}.{path_obj.suffix}"
+                        temp_path = os.path.join(temp_dir, temp_name)
+                        
+                        # Copy the file to temp location
+                        shutil.copy2(file_path, temp_path)
+                        self.logger.info(f"Created temporary copy for Chinese path: {temp_path}")
+                        
+                        # Add to temp files for cleanup
+                        if hasattr(result, 'temp_files'):
+                            result.temp_files.append(temp_path)
+                        
+                        return temp_path
+                    except Exception as e:
+                        self.logger.error(f"Failed to create temporary copy: {e}")
+                        return file_path
+                
+                # Try to resolve the path to handle encoding issues
+                try:
+                    # Try to get the real path (resolves symlinks and encoding issues)
+                    real_path = os.path.realpath(file_path)
+                    if real_path != file_path:
+                        self.logger.debug(f"Resolved path: {file_path} -> {real_path}")
+                        return real_path
+                except Exception as e:
+                    self.logger.debug(f"Could not resolve real path: {e}")
+            
+            return file_path
+            
+        except Exception as e:
+            self.logger.error(f"Error normalizing file path: {e}")
+            return file_path
+    
+    def _process_with_cnocr(self, doc: DocumentFile, file_path: str, ext: str) -> str:
+        """
+        Process loaded document with CnOCR for Chinese text recognition using batch processing.
+        
+        Args:
+            doc: Loaded DocumentFile
+            file_path: Original file path
+            ext: File extension
+            
+        Returns:
+            Processed markdown content
+        """
+        markdown_content = []
+        
+        try:
+            # Convert all pages to images for batch processing
+            page_images = []
+            for page in doc:
+                if hasattr(page, 'numpy'):
+                    # For PDF pages, convert to numpy array
+                    page_img = page.numpy()
+                else:
+                    # For image files, use the image directly
+                    page_img = page
+                page_images.append(page_img)
+            
+            # Process pages in batches using image_list functionality
+            batch_size = min(1, len(page_images))  # Process 1 page at a time (single page processing)
+            
+            for batch_start in range(0, len(page_images), batch_size):
+                batch_end = min(batch_start + batch_size, len(page_images))
+                batch_images = page_images[batch_start:batch_end]
+                
+                self.logger.debug(f"Processing batch {batch_start//batch_size + 1}: pages {batch_start + 1}-{batch_end}")
+                
+                try:
+                    # Use CnOCR's image_list functionality for batch processing
+                    if hasattr(self.cnocr, 'ocr') and hasattr(self.cnocr.ocr, '__call__'):
+                        # Process batch of images
+                        batch_results = []
+                        for img in batch_images:
+                            try:
+                                ocr_result = self.cnocr.ocr(img)
+                                batch_results.append(ocr_result)
+                            except Exception as e:
+                                self.logger.warning(f"CnOCR recognition failed for image in batch: {e}")
+                                batch_results.append([])
+                    else:
+                        # Fallback to individual processing
+                        batch_results = []
+                        for img in batch_images:
+                            try:
+                                if hasattr(self.cnocr, 'ocr'):
+                                    ocr_result = self.cnocr.ocr(img)
+                                elif hasattr(self.cnocr, 'readtext'):
+                                    ocr_result = self.cnocr.readtext(img)
+                                else:
+                                    ocr_result = self.cnocr(img)
+                                batch_results.append(ocr_result)
+                            except Exception as e:
+                                self.logger.warning(f"CnOCR recognition failed for image in batch: {e}")
+                                batch_results.append([])
+                    
+                    # Process batch results
+                    for batch_idx, ocr_result in enumerate(batch_results):
+                        page_idx = batch_start + batch_idx
+                        
+                        # Extract text from result
+                        if ocr_result and len(ocr_result) > 0:
+                            # Handle different result formats from CnOCR
+                            text_lines = []
+                            for item in ocr_result:
+                                if isinstance(item, dict) and 'text' in item:
+                                    # Format: {'text': '...', 'score': 0.9, 'position': [...]}
+                                    text_lines.append(item['text'])
+                                elif isinstance(item, (list, tuple)) and len(item) > 1:
+                                    # Format: [bbox, text, confidence] or similar
+                                    text_lines.append(str(item[1]))
+                                elif isinstance(item, str):
+                                    # Direct text
+                                    text_lines.append(item)
+                                else:
+                                    # Other formats, convert to string
+                                    text_lines.append(str(item))
+                            
+                            page_text = '\n'.join([line.strip() for line in text_lines if line.strip()])
+                        else:
+                            page_text = ""
+                        
+                        # Format content based on file type
+                        if ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif']:
+                            # For single images, use filename as header
+                            markdown_content.append(f"# {os.path.basename(file_path)}\n\n{page_text}")
+                        else:
+                            # For multi-page documents, use page numbers
+                            markdown_content.append(f"## Page {page_idx + 1}\n\n{page_text}")
+                        
+                        self.logger.debug(f"CnOCR processed page {page_idx + 1} with {len(ocr_result) if ocr_result else 0} text blocks")
+                
+                except Exception as batch_error:
+                    self.logger.error(f"Batch processing failed for batch {batch_start//batch_size + 1}: {batch_error}")
+                    # Fallback to individual processing for this batch
+                    for batch_idx, img in enumerate(batch_images):
+                        page_idx = batch_start + batch_idx
+                        try:
+                            ocr_result = self.cnocr.ocr(img)
+                            # Process individual result...
+                            # (简化处理，避免重复代码)
+                            markdown_content.append(f"## Page {page_idx + 1}\n\n[OCR processing failed]")
+                        except Exception as e:
+                            markdown_content.append(f"## Page {page_idx + 1}\n\n[OCR processing failed: {e}]")
+                
+        except Exception as e:
+            self.logger.error(f"CnOCR processing failed: {e}")
+            # Fallback to DocTR if CnOCR fails
+            return self._process_with_ocr(doc, file_path, ext)
         
         return "\n\n".join(markdown_content)
