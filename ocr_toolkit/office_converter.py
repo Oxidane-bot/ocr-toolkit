@@ -306,9 +306,13 @@ def create_temp_pdf(input_path: str) -> Optional[str]:
             logging.info(f"Created temporary PDF: {temp_pdf_path}")
             return temp_pdf_path
         else:
-            # Clean up failed temp file using enhanced cleanup
-            from .temp_file_manager import cleanup_temp_files
-            cleanup_temp_files([temp_pdf_path])
+            # Clean up failed temp file safely (local helper)
+            try:
+                import os
+                if os.path.exists(temp_pdf_path):
+                    os.remove(temp_pdf_path)
+            except Exception:
+                pass
             logging.error(f"Failed to convert {input_path} to PDF: {result['error']}")
             return None
             

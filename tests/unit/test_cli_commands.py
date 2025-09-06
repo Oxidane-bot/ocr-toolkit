@@ -68,7 +68,7 @@ class TestCLICommands:
         
     @patch('ocr_toolkit.cli.extract.load_ocr_model')
     @patch('ocr_toolkit.cli.extract.discover_files')
-    @patch('ocr_toolkit.cli.extract.dual_processor.create_dual_processor')
+    @patch('ocr_toolkit.cli.extract.ocr_processor_wrapper.create_ocr_processor_wrapper')
     def test_extract_main_no_files(self, mock_create_processor, mock_discover, mock_load_model):
         """Test extract main function when no files found."""
         mock_discover.return_value = ([], '/test')

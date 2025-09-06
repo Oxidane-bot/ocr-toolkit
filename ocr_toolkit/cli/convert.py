@@ -158,7 +158,7 @@ def main():
     warnings.filterwarnings("ignore", message="Cannot set non-stroke color because 2 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported", module="pypdf")
     warnings.filterwarnings("ignore", message="Could get FontBBox from font descriptor because None cannot be parsed as 4 floats", module="pypdf")
 
-    from .. import dual_processor
+    from .. import ocr_processor_wrapper
     from argparse import Namespace
 
     parser = create_parser()
@@ -214,14 +214,19 @@ def main():
         logging.info(f"Loading OCR model (det_arch={ocr_args.det_arch}, reco_arch={ocr_args.reco_arch})...")
         ocr_model = load_ocr_model(ocr_args.det_arch, ocr_args.reco_arch, ocr_args.cpu)
         
-        # Create dual processor
-        processor = dual_processor.DualProcessor(ocr_model)
+        # Create OCR processor wrapper (replaces legacy dual_processor)
+        processor = ocr_processor_wrapper.create_ocr_processor_wrapper(
+            ocr_model,
+            batch_size=ocr_args.batch_size,
+            use_zh=getattr(args, 'zh', False)
+        )
         
         # Process documents
         results = []
         for file_path in files_to_process:
             logging.info(f"Processing {file_path}...")
-            result = processor.process_document_dual(file_path, ocr_args)
+            # Use wrapper's backward-compatible interface
+            result = processor.process_document(file_path, ocr_args)
             results.append(result)
             
             # Save the result
@@ -249,11 +254,11 @@ def main():
         print(f"Failed conversions: {failed}")
         print(f"Success rate: {success_rate:.1f}%")
         
-        # Get dual processing statistics
-        stats = processor.get_statistics()
-        print(f"\nMethod Selection:")
-        print(f"  MarkItDown chosen: {stats['markitdown_chosen']} ({stats['markitdown_chosen_pct']:.1f}%)")
-        print(f"  OCR chosen: {stats['ocr_chosen']} ({stats['ocr_chosen_pct']:.1f}%)")
+        # Basic processing statistics (OCR-focused)
+        stats = processor.get_detailed_statistics() if hasattr(processor, 'get_detailed_statistics') else processor.get_statistics()
+        print(f"\nProcessing Stats:")
+        if 'success_rate' in stats:
+            print(f"  Success rate: {stats['success_rate']:.1f}%")
         
         # Determine output directory
         output_directory = args.output_dir if args.output_dir else os.path.join(args.input_path, config.DEFAULT_MARKDOWN_OUTPUT_DIR)

@@ -17,7 +17,21 @@ from doctr.io import DocumentFile
 
 from .base import FileProcessorBase, ProcessingResult
 from ..converters import get_office_converter
-from ..temp_file_manager import cleanup_temp_files
+
+def cleanup_temp_files(paths: list[str]) -> None:
+    """Safely delete a list of temporary files, ignoring errors."""
+    try:
+        import os
+        for temp_path in paths or []:
+            try:
+                if temp_path and os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except Exception:
+                # Best-effort cleanup; ignore individual failures
+                pass
+    except Exception:
+        # If anything unexpected happens, do not let cleanup fail processing
+        pass
 
 
 class OCRProcessor(FileProcessorBase):
