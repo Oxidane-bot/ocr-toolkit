@@ -8,8 +8,6 @@ the FileProcessorBase interface for consistent behavior.
 import os
 import time
 import logging
-import shutil
-import tempfile
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
@@ -17,21 +15,14 @@ from doctr.io import DocumentFile
 
 from .base import FileProcessorBase, ProcessingResult
 from ..converters import get_office_converter
+from ..utils import get_temp_manager, get_path_normalizer
+
 
 def cleanup_temp_files(paths: list[str]) -> None:
     """Safely delete a list of temporary files, ignoring errors."""
-    try:
-        import os
-        for temp_path in paths or []:
-            try:
-                if temp_path and os.path.exists(temp_path):
-                    os.remove(temp_path)
-            except Exception:
-                # Best-effort cleanup; ignore individual failures
-                pass
-    except Exception:
-        # If anything unexpected happens, do not let cleanup fail processing
-        pass
+    temp_manager = get_temp_manager()
+    for path in paths or []:
+        temp_manager.cleanup_file(path)
 
 
 class OCRProcessor(FileProcessorBase):
@@ -57,45 +48,51 @@ class OCRProcessor(FileProcessorBase):
         self.office_converter = get_office_converter()
         self.use_cnocr = use_cnocr
         self.logger = logging.getLogger(__name__)
+        self.temp_manager = get_temp_manager()
+        self.path_normalizer = get_path_normalizer()
         
         # Initialize CnOCR if requested
         if use_cnocr:
+            self._initialize_cnocr()
+    
+    def _initialize_cnocr(self) -> None:
+        """Initialize CnOCR for Chinese text recognition."""
+        try:
+            from cnocr import CnOcr
+            import os
+            
+            # Clear font path environment variable to avoid issues
+            if 'FONTPATH' in os.environ:
+                del os.environ['FONTPATH']
+            
+            # Let CnOCR use default configuration and auto-select backend
+            self.cnocr = CnOcr()
+            
+            # Debug: Check which backend CnOCR is actually using
             try:
-                from cnocr import CnOcr
-                import os
+                import onnxruntime as ort
+                providers = ort.get_available_providers()
+                self.logger.info(f"CnOCR: Available providers: {providers}")
                 
-                # Clear font path environment variable to avoid issues
-                if 'FONTPATH' in os.environ:
-                    del os.environ['FONTPATH']
+                # Check if CUDA is being used
+                if hasattr(self.cnocr, 'det_model') and hasattr(self.cnocr.det_model, 'session'):
+                    det_providers = self.cnocr.det_model.session.get_providers()
+                    self.logger.info(f"CnOCR: Detection model providers: {det_providers}")
                 
-                # Let CnOCR use default configuration and auto-select backend
-                self.cnocr = CnOcr()
-                
-                # Debug: Check which backend CnOCR is actually using
-                try:
-                    import onnxruntime as ort
-                    providers = ort.get_available_providers()
-                    self.logger.info(f"CnOCR: Available providers: {providers}")
+                if hasattr(self.cnocr, 'rec_model') and hasattr(self.cnocr.rec_model, 'session'):
+                    rec_providers = self.cnocr.rec_model.session.get_providers()
+                    self.logger.info(f"CnOCR: Recognition model providers: {rec_providers}")
                     
-                    # Check if CUDA is being used
-                    if hasattr(self.cnocr, 'det_model') and hasattr(self.cnocr.det_model, 'session'):
-                        det_providers = self.cnocr.det_model.session.get_providers()
-                        self.logger.info(f"CnOCR: Detection model providers: {det_providers}")
-                    
-                    if hasattr(self.cnocr, 'rec_model') and hasattr(self.cnocr.rec_model, 'session'):
-                        rec_providers = self.cnocr.rec_model.session.get_providers()
-                        self.logger.info(f"CnOCR: Recognition model providers: {rec_providers}")
-                        
-                except Exception as e:
-                    self.logger.debug(f"Could not check CnOCR backend: {e}")
-                
-                self.logger.info("CnOCR initialized successfully for Chinese text recognition")
-            except ImportError as e:
-                self.logger.warning("CnOCR not available, falling back to DocTR")
-                self.use_cnocr = False
             except Exception as e:
-                self.logger.warning(f"Failed to initialize CnOCR: {e}, falling back to DocTR")
-                self.use_cnocr = False
+                self.logger.debug(f"Could not check CnOCR backend: {e}")
+            
+            self.logger.info("CnOCR initialized successfully for Chinese text recognition")
+        except ImportError as e:
+            self.logger.warning("CnOCR not available, falling back to DocTR")
+            self.use_cnocr = False
+        except Exception as e:
+            self.logger.warning(f"Failed to initialize CnOCR: {e}, falling back to DocTR")
+            self.use_cnocr = False
     
     def get_supported_formats(self) -> List[str]:
         """Get list of supported file formats for OCR processing."""
@@ -182,7 +179,7 @@ class OCRProcessor(FileProcessorBase):
         """
         try:
             # Handle Chinese path encoding issues on Windows
-            normalized_path = self._normalize_file_path(file_path, result)
+            normalized_path = self.path_normalizer.normalize_path(file_path)
             
             if ext == '.pdf':
                 # Direct PDF processing
@@ -247,70 +244,6 @@ class OCRProcessor(FileProcessorBase):
         
         return "\n\n".join(markdown_content)
     
-    def _normalize_file_path(self, file_path: str, result: ProcessingResult) -> str:
-        """
-        Normalize file path to handle Chinese characters and encoding issues on Windows.
-        
-        Args:
-            file_path: Original file path
-            result: ProcessingResult object to add temp files to
-            
-        Returns:
-            Normalized file path that can be safely used with OpenCV and other libraries
-        """
-        try:
-            import os
-            from pathlib import Path
-            
-            # Convert to Path object for better handling
-            path_obj = Path(file_path)
-            
-            # Check if file exists
-            if not path_obj.exists():
-                self.logger.warning(f"File does not exist: {file_path}")
-                return file_path
-            
-            # On Windows, check if path contains non-ASCII characters
-            if os.name == 'nt':  # Windows
-                # Check if path contains Chinese or other non-ASCII characters
-                has_non_ascii = any(ord(char) > 127 for char in file_path)
-                
-                if has_non_ascii:
-                    self.logger.info(f"Detected non-ASCII characters in path, creating temporary copy")
-                    try:
-                        # Create a temporary file with ASCII name
-                        temp_dir = tempfile.gettempdir()
-                        temp_name = f"ocr_temp_{hash(file_path) % 10000}.{path_obj.suffix}"
-                        temp_path = os.path.join(temp_dir, temp_name)
-                        
-                        # Copy the file to temp location
-                        shutil.copy2(file_path, temp_path)
-                        self.logger.info(f"Created temporary copy for Chinese path: {temp_path}")
-                        
-                        # Add to temp files for cleanup
-                        if hasattr(result, 'temp_files'):
-                            result.temp_files.append(temp_path)
-                        
-                        return temp_path
-                    except Exception as e:
-                        self.logger.error(f"Failed to create temporary copy: {e}")
-                        return file_path
-                
-                # Try to resolve the path to handle encoding issues
-                try:
-                    # Try to get the real path (resolves symlinks and encoding issues)
-                    real_path = os.path.realpath(file_path)
-                    if real_path != file_path:
-                        self.logger.debug(f"Resolved path: {file_path} -> {real_path}")
-                        return real_path
-                except Exception as e:
-                    self.logger.debug(f"Could not resolve real path: {e}")
-            
-            return file_path
-            
-        except Exception as e:
-            self.logger.error(f"Error normalizing file path: {e}")
-            return file_path
     
     def _process_with_cnocr(self, doc: DocumentFile, file_path: str, ext: str) -> str:
         """

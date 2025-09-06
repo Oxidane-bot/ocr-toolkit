@@ -15,7 +15,8 @@ import ocrmypdf
 from doctr.io import DocumentFile
 from tqdm import tqdm
 
-from .. import common, config
+from .. import config
+from ..utils import load_ocr_model, discover_pdf_files, add_common_ocr_args
 
 
 def setup_logging():
@@ -168,7 +169,7 @@ def create_parser():
     )
     
     # Add common OCR arguments
-    common.add_common_args(parser)
+    add_common_ocr_args(parser)
     
     return parser
 
@@ -181,10 +182,10 @@ def main():
     
     try:
         # Load OCR model
-        model = common.load_ocr_model(args.det_arch, args.reco_arch, args.cpu)
+        model = load_ocr_model(args.det_arch, args.reco_arch, args.cpu)
         
         # Discover PDF files
-        pdf_files, base_dir = common.discover_pdf_files(args.input_path)
+        pdf_files, base_dir = discover_pdf_files(args.input_path)
         if not pdf_files:
             logging.error("No PDF files found to process.")
             sys.exit(1)

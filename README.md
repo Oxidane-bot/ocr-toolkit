@@ -24,10 +24,11 @@ Convert documents to Markdown instantly with MarkItDown technology and OCR fallb
 - 🔄 **Intelligent Fallback** - automatically switches to OCR when needed
 
 **Architecture Highlights:**
-- Clean modular design with separated OCR and MarkItDown processors
-- Unified processing interfaces for consistent behavior
-- Robust dual-processing approach that maximizes success rates
-- Enterprise-grade error handling and recovery
+- Clean modular design with factory pattern for processor management
+- High cohesion, low coupling architecture with separated concerns
+- Unified processing interfaces for consistent behavior across all processors
+- Intelligent processor selection based on file types and requirements
+- Enterprise-grade error handling and recovery with centralized temp file management
 
 ## 🛠️ Installation
 
@@ -291,9 +292,11 @@ ocr-search --no-jbig2 documents/
 ### Modular Design
 The toolkit follows a clean, modular architecture with high cohesion and low coupling:
 
-- **Processors Module**: Dedicated `OCRProcessor` and `MarkItDownProcessor` classes
+- **Factory Pattern**: `ProcessorFactory` manages processor creation and lifecycle
+- **Service Layer**: Dedicated services for path normalization, temp file management
+- **Processors Module**: Clean OCR and MarkItDown processors with unified interfaces
 - **Unified Interface**: Abstract `FileProcessorBase` ensures consistent behavior
-- **Quality Evaluation**: Intelligent quality scoring system chooses the best processing method
+- **Centralized Services**: Temporary file management, path normalization, model loading
 - **Error Handling**: Comprehensive error recovery with detailed logging
 - **Statistics Tracking**: Built-in performance and success rate monitoring
 
@@ -301,13 +304,19 @@ The toolkit follows a clean, modular architecture with high cohesion and low cou
 ```
 ocr_toolkit/
 ├── processors/          # Core processing engines
-│   ├── base.py         # Abstract interfaces
-│   ├── ocr_processor.py    # OCR processing
-│   ├── markitdown_processor.py  # MarkItDown processing
-│   └── stats.py        # Statistics tracking
-├── converters/         # Document conversion utilities  
-├── utils/             # Shared utilities
-└── cli/               # Command-line interfaces
+│   ├── base.py         # Abstract interfaces & ProcessingResult
+│   ├── factory.py      # ProcessorFactory for processor management
+│   ├── ocr_processor.py    # OCR processing with CnOCR support
+│   └── markitdown_processor.py  # MarkItDown processing
+├── utils/              # Service layer & utilities
+│   ├── temp_file_manager.py    # Centralized temp file management
+│   ├── path_normalizer.py      # Path normalization service
+│   ├── model_loader.py         # OCR model loading utilities
+│   ├── file_discovery.py       # File discovery & validation
+│   └── cli_args.py            # CLI argument utilities
+├── converters/         # File format converters
+├── cli/               # Command line interfaces
+└── config.py          # Centralized configuration
 ```
 
 ### For Developers

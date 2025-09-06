@@ -7,7 +7,8 @@ import logging
 import sys
 import os
 
-from .. import common, config
+from .. import config
+from ..utils import discover_pdf_files, add_common_ocr_args
 
 
 def setup_logging():
@@ -53,7 +54,7 @@ def create_parser():
     )
     
     # Add common OCR arguments
-    common.add_common_args(parser)
+    add_common_ocr_args(parser)
     
     return parser
 
@@ -72,7 +73,7 @@ def main():
         from .. import benchmark
         
         # Discover PDF files
-        pdf_files, base_dir = common.discover_pdf_files(args.input_path)
+        pdf_files, base_dir = discover_pdf_files(args.input_path)
         if not pdf_files:
             logging.error("No PDF files found for benchmarking.")
             sys.exit(1)

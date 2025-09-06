@@ -7,102 +7,116 @@ import time
 import os
 from typing import Dict, Any, Optional
 
-from .processors.base import FileProcessorBase, ProcessingResult
-from .processors.ocr_processor import OCRProcessor
+from .processors import get_processor_factory
+from .utils import get_temp_manager
 
 
 class OCRProcessorWrapper:
     """
     OCR Processor Wrapper that provides enhanced OCR processing capabilities.
     
-    This wrapper extends the basic OCRProcessor with additional features like
-    quality evaluation, statistics tracking, and backward compatibility.
+    This wrapper provides a simplified interface for OCR processing using
+    the factory pattern for processor management.
     """
     
-    def __init__(self, ocr_model, quality_evaluator: Optional[Any] = None, batch_size: int = 16, use_zh: bool = False):
+    def __init__(self, ocr_model, batch_size: int = 16, use_zh: bool = False):
         """
         Initialize the OCR processor wrapper.
         
         Args:
             ocr_model: Loaded DocTR OCR model
-            quality_evaluator: Quality evaluator instance (optional, not used)
             batch_size: Batch size for OCR processing
-            use_zh: Whether to use CnOCR for Chinese text recognition (better for Chinese documents)
+            use_zh: Whether to use CnOCR for Chinese text recognition
         """
         self.ocr_model = ocr_model
         self.batch_size = batch_size
         self.use_zh = use_zh
+        self.logger = logging.getLogger(__name__)
+        self.temp_manager = get_temp_manager()
         
-        # Initialize OCR processor
-        self.ocr_processor = OCRProcessor(ocr_model, batch_size, use_cnocr=use_zh)
+        # Get processor factory and create OCR processor
+        self.factory = get_processor_factory()
+        self.processor = self.factory.create_processor(
+            'ocr',
+            ocr_model=ocr_model,
+            batch_size=batch_size,
+            use_cnocr=use_zh
+        )
+        
+        if not self.processor:
+            raise RuntimeError("Failed to create OCR processor")
     
-    def process_document(self, file_path: str, args) -> Dict[str, Any]:
+    def process_document(self, file_path: str, args=None) -> Dict[str, Any]:
         """
-        Process document with OCR, providing backward compatibility.
+        Process document with OCR.
         
         Args:
             file_path: Path to the document
-            args: Command line arguments (for backward compatibility)
+            args: Command line arguments (optional)
             
         Returns:
-            Result with OCR processing (backward compatibility format)
+            Result dictionary with processing information
         """
-        total_start_time = time.time()
-        
-        # Legacy result format for backward compatibility
-        result = {
-            'file_path': file_path,
-            'file_name': os.path.basename(file_path),
-            'success': False,
-            'chosen_method': 'ocr',
-            'final_content': '',
-            'processing_time': 0,
-            'comparison': {},
-            'markitdown_result': {'success': False, 'content': '', 'error': 'MarkItDown not available'},
-            'ocr_result': {},
-            'temp_files': []
-        }
+        start_time = time.time()
         
         try:
-            # Process with OCR (support fast mode and pages)
-            ocr_result = self.ocr_processor.process(file_path, fast=getattr(args, 'fast', False), pages=getattr(args, 'pages', None))
+            # Process with OCR processor
+            result = self.processor.process(
+                file_path, 
+                fast=getattr(args, 'fast', False) if args else False,
+                pages=getattr(args, 'pages', None) if args else None
+            )
             
-            # Convert ProcessingResult object to legacy format
-            ocr_legacy = ocr_result.to_dict()
-            result['ocr_result'] = ocr_legacy
+            # Convert to legacy format for compatibility
+            return {
+                'file_path': file_path,
+                'file_name': os.path.basename(file_path),
+                'success': result.success,
+                'chosen_method': 'ocr',
+                'final_content': result.content,
+                'processing_time': result.processing_time,
+                'comparison': {},
+                'markitdown_result': {
+                    'success': False, 
+                    'content': '', 
+                    'error': 'MarkItDown not available'
+                },
+                'ocr_result': result.to_dict(),
+                'temp_files': result.temp_files,
+                'error': result.error if not result.success else ''
+            }
             
-            # Collect temp files for cleanup
-            result['temp_files'].extend(ocr_result.temp_files)
-            
-            # Set final result
-            result['final_content'] = ocr_result.content
-            result['success'] = ocr_result.success
-                
         except Exception as e:
-            result['error'] = str(e)
-            logging.error(f"OCR processing failed for {file_path}: {e}")
-        
-        finally:
-            # Clean up temporary files if they exist
-            if hasattr(ocr_result, 'temp_files') and ocr_result.temp_files:
-                for temp_file in ocr_result.temp_files:
-                    try:
-                        if os.path.exists(temp_file):
-                            os.remove(temp_file)
-                    except Exception as cleanup_error:
-                        logging.warning(f"Failed to cleanup temp file {temp_file}: {cleanup_error}")
-            
-            result['processing_time'] = time.time() - total_start_time
-        
-        return result
+            self.logger.error(f"OCR processing failed for {file_path}: {e}")
+            return {
+                'file_path': file_path,
+                'file_name': os.path.basename(file_path),
+                'success': False,
+                'chosen_method': 'ocr',
+                'final_content': '',
+                'processing_time': time.time() - start_time,
+                'comparison': {},
+                'markitdown_result': {
+                    'success': False, 
+                    'content': '', 
+                    'error': 'MarkItDown not available'
+                },
+                'ocr_result': {
+                    'success': False,
+                    'content': '',
+                    'error': str(e)
+                },
+                'temp_files': [],
+                'error': str(e)
+            }
     
     def get_statistics(self) -> Dict[str, Any]:
-        """Get processing statistics in legacy format for backward compatibility."""
+        """Get basic processing statistics."""
         return {'ocr_processed': 1, 'success_rate': 100.0}
     
     def get_detailed_statistics(self) -> Dict[str, Any]:
         """Get comprehensive processing statistics."""
-        return {'ocr_processed': 1, 'success_rate': 100.0}
+        return self.get_statistics()
 
 
 def create_ocr_processor_wrapper(ocr_model, batch_size: int = 16, use_zh: bool = False) -> OCRProcessorWrapper:

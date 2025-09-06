@@ -47,8 +47,8 @@ class TestOCRProcessorWrapper:
     def test_init(self):
         """Test OCRProcessorWrapper initialization."""
         assert self.processor is not None
-        # Simplified architecture - no quality_evaluator or stats
-        assert hasattr(self.processor, 'ocr_processor')
+        # Simplified architecture using factory pattern
+        assert hasattr(self.processor, 'processor')
         assert hasattr(self.processor, 'batch_size')
         assert hasattr(self.processor, 'use_zh')
         assert self.processor.batch_size == 16
@@ -58,14 +58,14 @@ class TestOCRProcessorWrapper:
         """Test OCRProcessorWrapper initialization with Chinese support."""
         processor = OCRProcessorWrapper(self.mock_ocr_model, use_zh=True)
         assert processor.use_zh == True
-        assert hasattr(processor, 'ocr_processor')
+        assert hasattr(processor, 'processor')
         
     def test_init_with_custom_evaluator(self):
-        """Test OCRProcessorWrapper initialization with custom evaluator (ignored in new architecture)."""
-        processor = OCRProcessorWrapper(self.mock_ocr_model, "ignored_evaluator")
-        # Custom evaluator is ignored in new architecture
+        """Test OCRProcessorWrapper initialization with custom evaluator (signature changed)."""
+        # The new OCRProcessorWrapper signature no longer accepts quality_evaluator
+        processor = OCRProcessorWrapper(self.mock_ocr_model)
         assert processor is not None
-        assert hasattr(processor, 'ocr_processor')
+        assert hasattr(processor, 'processor')
         
     def test_get_statistics(self):
         """Test statistics calculation."""
@@ -92,8 +92,8 @@ class TestOCRProcessorWrapper:
         processor = create_ocr_processor_wrapper(self.mock_ocr_model)
         
         assert isinstance(processor, OCRProcessorWrapper)
-        # New simplified architecture
-        assert hasattr(processor, 'ocr_processor')
+        # New simplified architecture using factory pattern
+        assert hasattr(processor, 'processor')
         assert not hasattr(processor, 'markitdown_processor')  # No longer exists
         
     def test_create_ocr_processor_wrapper_with_chinese_support(self):
@@ -102,7 +102,7 @@ class TestOCRProcessorWrapper:
         
         assert isinstance(processor, OCRProcessorWrapper)
         assert processor.use_zh == True
-        assert hasattr(processor, 'ocr_processor')
+        assert hasattr(processor, 'processor')
         
     def test_process_document(self):
         """Test document processing."""
@@ -110,14 +110,17 @@ class TestOCRProcessorWrapper:
         mock_ocr_result = Mock()
         mock_ocr_result.content = "Test content"
         mock_ocr_result.success = True
+        mock_ocr_result.processing_time = 1.0
+        mock_ocr_result.error = ""
         mock_ocr_result.temp_files = []
         mock_ocr_result.to_dict.return_value = {
             'content': 'Test content',
             'success': True,
+            'processing_time': 1.0,
             'temp_files': []
         }
         
-        with patch.object(self.processor.ocr_processor, 'process', return_value=mock_ocr_result):
+        with patch.object(self.processor.processor, 'process', return_value=mock_ocr_result):
             result = self.processor.process_document("test.pdf", self.args)
             
             assert result['success'] == True
