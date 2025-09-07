@@ -26,11 +26,11 @@ dependencies = [
     # OCR support (for scanned documents)
     "torch>=2.7.0",
     "torchvision>=0.18.0",
-    "python-doctr[torch]",
+    "python-doctr>=1.0.0",
     "ocrmypdf",
     "pdf2image",
-    # Use NumPy 1.x for compatibility with python-doctr 1.0.0
-    "numpy==1.26.3",
+    # Use NumPy 1.26.4 for stable compatibility (non-MINGW-W64 build)
+    "numpy==1.26.4",
     "scikit-image",
     # Core utilities
     "tqdm",
