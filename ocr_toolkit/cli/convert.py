@@ -16,6 +16,8 @@ from pathlib import Path
 from .. import config
 from ..utils import discover_files, load_ocr_model, get_output_file_path, add_common_ocr_args
 
+import torch
+
 
 
 def setup_logging():
@@ -29,7 +31,7 @@ def setup_logging():
 def create_parser():
     """Create argument parser for convert command."""
     parser = argparse.ArgumentParser(
-        description="Convert documents to Markdown using MarkItDown",
+        description="Convert documents to Markdown using advanced OCR",
         prog="ocr-convert",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
@@ -212,6 +214,7 @@ def main():
         
         # Load OCR model
         logging.info(f"Loading OCR model (det_arch={ocr_args.det_arch}, reco_arch={ocr_args.reco_arch})...")
+        logging.info(f"CPU flag: {ocr_args.cpu}, CUDA available: {torch.cuda.is_available()}")
         ocr_model = load_ocr_model(ocr_args.det_arch, ocr_args.reco_arch, ocr_args.cpu)
         
         # Create OCR processor wrapper (replaces legacy dual_processor)

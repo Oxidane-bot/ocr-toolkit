@@ -5,7 +5,10 @@
       "Bash(uv:*)",
       "Bash(mkdir:*)",
       "Bash(mv:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(where uv)",
+      "Bash(powershell:*)",
+      "Read(//c/Users/Oxidane/AppData/Roaming/uv/tools/ocr-cli/**)"
     ],
     "deny": []
   }

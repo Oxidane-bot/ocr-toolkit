@@ -60,10 +60,32 @@ class OCRProcessor(FileProcessorBase):
         try:
             from cnocr import CnOcr
             import os
+            import sys
+            import shutil
             
             # Clear font path environment variable to avoid issues
             if 'FONTPATH' in os.environ:
                 del os.environ['FONTPATH']
+            
+            # Fix PATH for huggingface-cli if we're in UV tool environment
+            original_path = os.environ.get('PATH', '')
+            script_dir = os.path.dirname(sys.executable)
+            if script_dir not in original_path:
+                os.environ['PATH'] = f"{script_dir};{original_path}"
+                self.logger.debug(f"Added {script_dir} to PATH for huggingface-cli access")
+            
+            # Set UTF-8 encoding for Windows console to avoid Unicode errors
+            os.environ['PYTHONIOENCODING'] = 'utf-8'
+            os.environ['PYTHONUTF8'] = '1'
+            
+            # Verify huggingface-cli is accessible
+            hf_cli_path = shutil.which('huggingface-cli')
+            if hf_cli_path:
+                self.logger.debug(f"Found huggingface-cli at: {hf_cli_path}")
+            else:
+                self.logger.warning("huggingface-cli not found in PATH, CnOCR model download may fail")
+            
+            self.logger.info("Initializing CnOCR for Chinese text recognition...")
             
             # Let CnOCR use default configuration and auto-select backend
             self.cnocr = CnOcr()
@@ -72,16 +94,16 @@ class OCRProcessor(FileProcessorBase):
             try:
                 import onnxruntime as ort
                 providers = ort.get_available_providers()
-                self.logger.info(f"CnOCR: Available providers: {providers}")
+                self.logger.debug(f"CnOCR: Available providers: {providers}")
                 
                 # Check if CUDA is being used
                 if hasattr(self.cnocr, 'det_model') and hasattr(self.cnocr.det_model, 'session'):
                     det_providers = self.cnocr.det_model.session.get_providers()
-                    self.logger.info(f"CnOCR: Detection model providers: {det_providers}")
+                    self.logger.debug(f"CnOCR: Detection model providers: {det_providers}")
                 
                 if hasattr(self.cnocr, 'rec_model') and hasattr(self.cnocr.rec_model, 'session'):
                     rec_providers = self.cnocr.rec_model.session.get_providers()
-                    self.logger.info(f"CnOCR: Recognition model providers: {rec_providers}")
+                    self.logger.debug(f"CnOCR: Recognition model providers: {rec_providers}")
                     
             except Exception as e:
                 self.logger.debug(f"Could not check CnOCR backend: {e}")
@@ -90,8 +112,23 @@ class OCRProcessor(FileProcessorBase):
         except ImportError as e:
             self.logger.warning("CnOCR not available, falling back to DocTR")
             self.use_cnocr = False
+        except FileNotFoundError as e:
+            if "huggingface-cli" in str(e):
+                self.logger.error(f"CnOCR model download failed: huggingface-cli not found. "
+                                "Please ensure huggingface-hub[cli] is installed.")
+            else:
+                self.logger.error(f"CnOCR model files missing: {e}")
+            self.logger.info("Falling back to DocTR for OCR processing")
+            self.use_cnocr = False
         except Exception as e:
-            self.logger.warning(f"Failed to initialize CnOCR: {e}, falling back to DocTR")
+            error_msg = str(e)
+            if "does not exists" in error_msg or "onnx" in error_msg.lower():
+                self.logger.error(f"CnOCR model download incomplete: {e}")
+                self.logger.info("You may need to run: huggingface-cli download --help")
+                self.logger.info("Or delete CnOCR cache and retry to force model re-download")
+            else:
+                self.logger.error(f"CnOCR initialization failed: {e}")
+            self.logger.info("Falling back to DocTR for OCR processing")
             self.use_cnocr = False
     
     def get_supported_formats(self) -> List[str]:

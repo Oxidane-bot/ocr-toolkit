@@ -1,12 +1,12 @@
 [project]
 name = "ocr-cli"
 version = "0.2.0"
-description = "Fast document to Markdown converter with MarkItDown and OCR support"
+description = "Fast document to Markdown converter with advanced OCR support"
 authors = [{name = "OCR Toolkit Team", email = "contact@example.com"}]
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.12.0"
-keywords = ["document-conversion", "markdown", "ocr", "markitdown", "cli"]
+keywords = ["document-conversion", "markdown", "ocr", "cli"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
@@ -29,18 +29,20 @@ dependencies = [
     "python-doctr>=1.0.0",
     "ocrmypdf",
     "pdf2image",
-    # Use NumPy 1.26.4 for stable compatibility (non-MINGW-W64 build)
-    "numpy==1.26.4",
+    # Use NumPy 2.0 to resolve MINGW-W64 Windows build issues
+    "numpy>=2.0.0,<3.0.0",
     "scikit-image",
     # Core utilities
     "tqdm",
     "psutil>=7.0.0",
-    # Use OpenCV version compatible with NumPy 1.x
-    "opencv-python>=4.8.0,<4.9.0",
+    # Let dependencies choose their preferred OpenCV version
+    # "opencv-python>=4.8.0,<4.9.0",  # Removed - let EasyOCR/doctr choose
     "easyocr>=1.7.2",
     # Prefer GPU ONNX Runtime only (pin to 1.20.x)
     "onnxruntime-gpu>=1.20.0,<1.21.0",
     "cnocr[ort-gpu]>=2.3.2.1",
+    # Hugging Face Hub for model downloads (required by CnOCR)
+    "huggingface-hub[cli]>=0.28.0",
 ]
 
 [project.optional-dependencies]
@@ -71,6 +73,8 @@ Issues = "https://github.com/USER/ocr-toolkit/issues"
 
 [tool.uv]
 extra-index-url = ["https://download.pytorch.org/whl/cu128"]
+# NumPy 2.0 resolves MINGW-W64 Windows build issues
+index-strategy = "unsafe-best-match"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]

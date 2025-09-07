@@ -84,15 +84,3 @@ def mock_ocr_result():
         'method': 'ocr',
         'error': ''
     }
-
-
-@pytest.fixture
-def mock_markitdown_result():
-    """Mock MarkItDown processing result for testing."""
-    return {
-        'success': True,
-        'content': '# Document Title\n\nWell-formatted markdown content',
-        'processing_time': 0.8,
-        'method': 'markitdown',
-        'error': ''
-    }

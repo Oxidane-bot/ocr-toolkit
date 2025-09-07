@@ -76,11 +76,6 @@ class OCRProcessorWrapper:
                 'final_content': result.content,
                 'processing_time': result.processing_time,
                 'comparison': {},
-                'markitdown_result': {
-                    'success': False, 
-                    'content': '', 
-                    'error': 'MarkItDown not available'
-                },
                 'ocr_result': result.to_dict(),
                 'temp_files': result.temp_files,
                 'error': result.error if not result.success else ''
@@ -96,11 +91,6 @@ class OCRProcessorWrapper:
                 'final_content': '',
                 'processing_time': time.time() - start_time,
                 'comparison': {},
-                'markitdown_result': {
-                    'success': False, 
-                    'content': '', 
-                    'error': 'MarkItDown not available'
-                },
                 'ocr_result': {
                     'success': False,
                     'content': '',

@@ -198,9 +198,4 @@ def _register_default_processors(factory: ProcessorFactory) -> None:
     except ImportError as e:
         logging.getLogger(__name__).warning(f"Could not register OCR processor: {e}")
     
-    try:
-        # Register MarkItDown processor
-        from .markitdown_processor import MarkItDownProcessor
-        factory.register_processor('markitdown', MarkItDownProcessor)
-    except ImportError as e:
-        logging.getLogger(__name__).warning(f"Could not register MarkItDown processor: {e}")
+    # MarkItDown processor has been removed - we now focus on OCR only

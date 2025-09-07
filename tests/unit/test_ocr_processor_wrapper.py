@@ -127,4 +127,5 @@ class TestOCRProcessorWrapper:
             assert result['chosen_method'] == 'ocr'
             assert result['final_content'] == 'Test content'
             assert 'ocr_result' in result
-            assert 'markitdown_result' in result
+            # MarkItDown has been removed, only OCR results are returned
+            assert 'markitdown_result' not in result

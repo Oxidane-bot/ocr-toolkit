@@ -112,3 +112,52 @@ class TestOCRProcessor:
         assert isinstance(result, ProcessingResult)
         assert result.success == False
         assert 'invalid file' in result.error.lower()
+        
+    def test_init_with_cnocr_enabled(self):
+        """Test OCRProcessor initialization with CnOCR enabled."""
+        with patch('ocr_toolkit.processors.ocr_processor.OCRProcessor._initialize_cnocr') as mock_init:
+            processor = OCRProcessor(self.mock_ocr_model, use_cnocr=True)
+            assert processor.use_cnocr == True
+            mock_init.assert_called_once()
+    
+    def test_init_with_cnocr_disabled(self):
+        """Test OCRProcessor initialization with CnOCR disabled."""
+        processor = OCRProcessor(self.mock_ocr_model, use_cnocr=False)
+        assert processor.use_cnocr == False
+        assert not hasattr(processor, 'cnocr')
+    
+    def test_initialize_cnocr_success(self):
+        """Test successful CnOCR initialization."""
+        with patch('shutil.which', return_value='/path/to/huggingface-cli'), \
+             patch('sys.executable', '/path/to/python.exe'), \
+             patch('cnocr.CnOcr') as mock_cnocr:
+            
+            mock_cnocr_instance = Mock()
+            mock_cnocr.return_value = mock_cnocr_instance
+            
+            processor = OCRProcessor(self.mock_ocr_model, use_cnocr=True)
+            
+            assert processor.use_cnocr == True
+            assert hasattr(processor, 'cnocr')
+            mock_cnocr.assert_called_once()
+    
+    def test_initialize_cnocr_import_error(self):
+        """Test CnOCR initialization with import error."""
+        with patch('builtins.__import__', side_effect=ImportError("CnOCR not available")):
+            processor = OCRProcessor(self.mock_ocr_model, use_cnocr=True)
+            assert processor.use_cnocr == False
+            assert not hasattr(processor, 'cnocr')
+    
+    def test_initialize_cnocr_file_not_found_error(self):
+        """Test CnOCR initialization with file not found error."""
+        with patch('cnocr.CnOcr', side_effect=FileNotFoundError("Model file missing")):
+            processor = OCRProcessor(self.mock_ocr_model, use_cnocr=True)
+            assert processor.use_cnocr == False
+            assert not hasattr(processor, 'cnocr')
+    
+    def test_initialize_cnocr_model_download_error(self):
+        """Test CnOCR initialization with model download error."""
+        with patch('cnocr.CnOcr', side_effect=Exception("model.onnx does not exists")):
+            processor = OCRProcessor(self.mock_ocr_model, use_cnocr=True)
+            assert processor.use_cnocr == False
+            assert not hasattr(processor, 'cnocr')
