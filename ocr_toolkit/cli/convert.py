@@ -11,10 +11,11 @@ import warnings
 import os
 import argparse
 import sys
+import time
 from pathlib import Path
 
 from .. import config
-from ..utils import discover_files, load_ocr_model, get_output_file_path, add_common_ocr_args
+from ..utils import discover_files, load_ocr_model, get_output_file_path, add_common_ocr_args, add_output_args, get_directory_cache, generate_file_tree
 
 import torch
 
@@ -68,13 +69,6 @@ Supported formats:
     )
     
     parser.add_argument(
-        "--output-dir",
-        type=str,
-        default=None,
-        help=f"Output directory for Markdown files (default: '{config.DEFAULT_MARKDOWN_OUTPUT_DIR}' in input directory)"
-    )
-    
-    parser.add_argument(
         "--workers",
         type=int,
         default=4,
@@ -87,17 +81,8 @@ Supported formats:
         help="List supported file formats and exit"
     )
     
-    parser.add_argument(
-        "--quiet", "-q",
-        action="store_true",
-        help="Reduce output verbosity"
-    )
-    
-    parser.add_argument(
-        "--verbose", "-v",
-        action="store_true",
-        help="Increase output verbosity"
-    )
+    # Add common output arguments (includes preserve-structure, no-recursive)
+    add_output_args(parser)
     
     # Add common OCR arguments
     add_common_ocr_args(parser)
@@ -187,20 +172,27 @@ def main():
     setup_logging()
     
     try:
+        # Record start time for performance monitoring
+        conversion_start_time = time.time()
+        
         # Validate input path
         if not os.path.exists(args.input_path):
             logging.error(f"Input path does not exist: {args.input_path}")
             sys.exit(1)
         
         # Discover files to process
-        files_to_process, _ = discover_files(args.input_path)
+        recursive = not args.no_recursive
+        files_to_process, base_dir, file_relative_paths = discover_files(args.input_path, recursive=recursive)
 
         if not files_to_process:
             logging.info("No supported files found to process.")
             sys.exit(0)
         
         # Display initial information
-        logging.info(f"Converting {len(files_to_process)} files from: {args.input_path}")
+        search_type = "recursively" if recursive else "non-recursively"
+        logging.info(f"Searching {search_type} - found {len(files_to_process)} files from: {args.input_path}")
+        if args.preserve_structure:
+            logging.info("Directory structure will be preserved in output")
         if args.output_dir:
             logging.info(f"Output directory: {args.output_dir}")
         
@@ -224,23 +216,104 @@ def main():
             use_zh=getattr(args, 'zh', False)
         )
         
-        # Process documents
+        # Get directory cache for optimized directory creation
+        dir_cache = get_directory_cache()
+        dir_cache.reset()  # Reset cache for this conversion session
+        
+        # Display output directory structure preview for preserve structure mode
+        if args.preserve_structure and len(files_to_process) > 1:
+            # Determine output directory for preview
+            output_directory = args.output_dir if args.output_dir else os.path.join(base_dir, config.DEFAULT_MARKDOWN_OUTPUT_DIR)
+            
+            logging.info("Directory structure preview:")
+            logging.info(f"  Input base: {base_dir}")
+            logging.info(f"  Output base: {output_directory}")
+            logging.info("")
+            
+            # Generate and display file tree
+            tree_display = generate_file_tree(file_relative_paths, show_all=len(files_to_process) <= 20)
+            logging.info("Output file tree:")
+            for line in tree_display.split('\n'):
+                if line.strip():  # Skip empty lines
+                    logging.info(f"  {line}")
+            logging.info("")
+        
+        # Process documents with enhanced error handling
         results = []
+        total_pages = 0
+        processed_count = 0
         for file_path in files_to_process:
-            logging.info(f"Processing {file_path}...")
-            # Use wrapper's backward-compatible interface
-            result = processor.process_document(file_path, ocr_args)
-            results.append(result)
-            
-            # Save the result
-            output_file_path = get_output_file_path(file_path, args.output_dir)
-            os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
-            with open(output_file_path, 'w', encoding='utf-8') as f:
-                f.write(result['final_content'])
-            
-            status = "SUCCESS" if result['success'] else "FAILED"
-            method = result['chosen_method']
-            logging.info(f"  -> {status} (Method: {method})")
+            processed_count += 1
+            try:
+                # Enhanced logging for preserve structure mode
+                if args.preserve_structure:
+                    relative_path = file_relative_paths.get(file_path, os.path.basename(file_path))
+                    logging.info(f"Processing [{processed_count}/{len(files_to_process)}]: {file_path} -> {relative_path}")
+                else:
+                    logging.info(f"Processing [{processed_count}/{len(files_to_process)}]: {file_path}")
+                
+                # Use wrapper's backward-compatible interface
+                result = processor.process_document(file_path, ocr_args)
+                results.append(result)
+                
+                # Track page count for statistics
+                pages = result.get('pages', 0)
+                if pages == 0:
+                    # Estimate pages if not available (assume at least 1 page per successful file)
+                    pages = 1 if result['success'] else 0
+                total_pages += pages
+                
+                # Get relative path for structure preservation
+                relative_path = file_relative_paths.get(file_path, os.path.basename(file_path))
+                
+                # Save the result with error handling
+                try:
+                    output_file_path = get_output_file_path(
+                        file_path, 
+                        args.output_dir, 
+                        preserve_structure=args.preserve_structure,
+                        relative_path=relative_path
+                    )
+                    
+                    # Use cached directory creation
+                    dir_cache.ensure_directory(os.path.dirname(output_file_path))
+                    
+                    with open(output_file_path, 'w', encoding='utf-8') as f:
+                        f.write(result['final_content'])
+                        
+                    logging.debug(f"Saved output to: {output_file_path}")
+                        
+                except (IOError, OSError) as e:
+                    logging.error(f"Failed to save output file for {file_path}: {e}")
+                    # Mark as failed if file saving failed
+                    result['success'] = False
+                    result['error'] = f"File save error: {e}"
+                
+                status = "SUCCESS" if result['success'] else "FAILED"
+                method = result['chosen_method']
+                processing_time = result.get('processing_time', 0)
+                logging.info(f"  -> {status} (Method: {method}, Time: {processing_time:.2f}s, Pages: {pages})")
+                
+                if not result['success'] and 'error' in result:
+                    logging.warning(f"  -> Error details: {result['error']}")
+                    
+            except Exception as e:
+                # Handle unexpected errors during processing
+                logging.error(f"Unexpected error processing {file_path}: {e}")
+                if args.verbose:
+                    import traceback
+                    logging.debug(traceback.format_exc())
+                    
+                # Add failed result to maintain count accuracy
+                error_result = {
+                    'success': False,
+                    'error': f"Unexpected error: {e}",
+                    'chosen_method': 'none',
+                    'processing_time': 0,
+                    'final_content': '',
+                    'file_name': os.path.basename(file_path)
+                }
+                results.append(error_result)
         
         # Display results summary
         print("\n" + "="*60)
@@ -252,10 +325,30 @@ def main():
         failed = total_files - successful
         success_rate = (successful / total_files * 100) if total_files > 0 else 0
         
+        # Calculate detailed timing statistics
+        total_processing_time = sum(r.get('processing_time', 0) for r in results)
+        average_time_per_file = total_processing_time / total_files if total_files > 0 else 0
+        average_time_per_page = total_processing_time / total_pages if total_pages > 0 else 0
+        
+        # Calculate overall conversion time
+        conversion_end_time = time.time()
+        total_conversion_time = conversion_end_time - conversion_start_time
+        overhead_time = total_conversion_time - total_processing_time
+        
         print(f"Total files processed: {total_files}")
+        print(f"Total pages processed: {total_pages}")
         print(f"Successful conversions: {successful}")
         print(f"Failed conversions: {failed}")
         print(f"Success rate: {success_rate:.1f}%")
+        print(f"")
+        print(f"PERFORMANCE METRICS:")
+        print(f"Total conversion time: {total_conversion_time:.2f}s")
+        print(f"Pure processing time: {total_processing_time:.2f}s")
+        print(f"Overhead time (I/O, setup): {overhead_time:.2f}s ({overhead_time/total_conversion_time*100:.1f}%)")
+        print(f"Average time per file: {average_time_per_file:.2f}s")
+        if total_pages > 0:
+            print(f"Average time per page: {average_time_per_page:.2f}s")
+            print(f"Processing throughput: {total_pages/total_processing_time:.1f} pages/sec")
         
         # Basic processing statistics (OCR-focused)
         stats = processor.get_detailed_statistics() if hasattr(processor, 'get_detailed_statistics') else processor.get_statistics()
@@ -264,8 +357,28 @@ def main():
             print(f"  Success rate: {stats['success_rate']:.1f}%")
         
         # Determine output directory
-        output_directory = args.output_dir if args.output_dir else os.path.join(args.input_path, config.DEFAULT_MARKDOWN_OUTPUT_DIR)
-        print(f"Output directory: {output_directory}")
+        if args.preserve_structure:
+            structure_note = " (preserving directory structure)"
+        else:
+            structure_note = " (flat structure)"
+        output_directory = args.output_dir if args.output_dir else os.path.join(base_dir, config.DEFAULT_MARKDOWN_OUTPUT_DIR)
+        print(f"Output directory: {output_directory}{structure_note}")
+        
+        # Display structure preservation summary for preserve structure mode
+        if args.preserve_structure and successful > 0:
+            print(f"\nDirectory Structure Summary:")
+            print(f"  Input base: {base_dir}")
+            print(f"  Output base: {output_directory}")
+            print(f"  Structure preserved: {successful} files in their original hierarchy")
+            if len(files_to_process) > 1:
+                unique_dirs = set()
+                for file_path in files_to_process:
+                    relative_path = file_relative_paths.get(file_path, os.path.basename(file_path))
+                    rel_dir = os.path.dirname(relative_path)
+                    if rel_dir and rel_dir != '.':
+                        unique_dirs.add(rel_dir)
+                if unique_dirs:
+                    print(f"  Directories created: {len(unique_dirs)} subdirectories")
         
         # List failed files if any
         if failed > 0:
@@ -275,7 +388,7 @@ def main():
                     error = file_result.get('error', 'Unknown error')
                     print(f"  - {file_result['file_name']}: {error}")
         
-        print(f"\nConversion completed! Files saved to: {output_directory}")
+        print(f"\nConversion completed! Files saved to: {output_directory}{structure_note}")
         
         # Exit with error code if any files failed
         if failed > 0:

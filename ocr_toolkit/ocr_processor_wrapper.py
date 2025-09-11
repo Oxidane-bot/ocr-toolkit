@@ -75,6 +75,7 @@ class OCRProcessorWrapper:
                 'chosen_method': 'ocr',
                 'final_content': result.content,
                 'processing_time': result.processing_time,
+                'pages': result.pages,
                 'comparison': {},
                 'ocr_result': result.to_dict(),
                 'temp_files': result.temp_files,
@@ -90,6 +91,7 @@ class OCRProcessorWrapper:
                 'chosen_method': 'ocr',
                 'final_content': '',
                 'processing_time': time.time() - start_time,
+                'pages': 0,
                 'comparison': {},
                 'ocr_result': {
                     'success': False,

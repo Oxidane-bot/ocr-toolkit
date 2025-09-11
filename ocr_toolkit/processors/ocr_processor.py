@@ -188,8 +188,9 @@ class OCRProcessor(FileProcessorBase):
             
             result.content = content
             result.success = True
+            result.pages = len(doc) if doc else 1  # Set the correct page count
             
-            self.logger.debug(f"OCR processed {file_path} successfully")
+            self.logger.debug(f"OCR processed {file_path} successfully with {result.pages} pages")
             
         except Exception as e:
             return self._handle_exception(e, result)

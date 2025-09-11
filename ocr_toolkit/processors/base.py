@@ -29,6 +29,7 @@ class ProcessingResult:
     error: str = ''
     file_path: str = ''
     file_name: str = ''
+    pages: int = 0
     temp_files: List[str] = None
     metadata: Dict[str, Any] = None
     
@@ -53,6 +54,7 @@ class ProcessingResult:
             'error': self.error,
             'file_path': self.file_path,
             'file_name': self.file_name,
+            'pages': self.pages,
             'temp_files': self.temp_files,
             'metadata': self.metadata
         }
@@ -127,6 +129,7 @@ class FileProcessorBase(ABC):
             file_path=file_path,
             file_name=os.path.basename(file_path),
             error='',
+            pages=0,
             temp_files=[],
             metadata={}
         )
