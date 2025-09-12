@@ -23,6 +23,24 @@ def setup_logging() -> None:
     )
 
 
+def setup_logging_with_file(log_file_path: str, encoding: str = 'utf-8') -> None:
+    """
+    Configure logging with both console and file output.
+    
+    Args:
+        log_file_path: Path to the log file
+        encoding: File encoding (default: utf-8)
+    """
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.FileHandler(log_file_path, encoding=encoding),
+            logging.StreamHandler()
+        ]
+    )
+
+
 class BaseArgumentParser:
     """
     Base argument parser class that provides common CLI argument patterns.

@@ -29,6 +29,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from ocr_toolkit import common, config
 from ocr_toolkit.quality_evaluator import QualityEvaluator
+from ocr_toolkit.utils import setup_logging_with_file
 from doctr.io import DocumentFile
 
 @dataclass
@@ -111,14 +112,7 @@ class ModelComparisonTester:
     def setup_logging(self):
         """设置日志"""
         log_file = os.path.join(self.output_dir, f"model_comparison_{int(time.time())}.log")
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            handlers=[
-                logging.FileHandler(log_file, encoding='utf-8'),
-                logging.StreamHandler(sys.stdout)
-            ]
-        )
+        setup_logging_with_file(log_file, encoding='utf-8')
         logging.info(f"日志文件: {log_file}")
 
     def get_memory_usage(self) -> float:

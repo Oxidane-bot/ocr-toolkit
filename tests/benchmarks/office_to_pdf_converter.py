@@ -13,13 +13,14 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import shutil
 
+# Add project root to path for importing utilities
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+from ocr_toolkit.utils import setup_logging as setup_logging_shared
+
 
 def setup_logging():
     """Configure logging for the converter."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s"
-    )
+    setup_logging_shared()
 
 
 def convert_docx_to_pdf_simple(input_path: str, output_path: str) -> Dict[str, Any]:

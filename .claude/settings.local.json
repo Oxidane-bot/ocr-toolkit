@@ -8,7 +8,8 @@
       "Bash(python:*)",
       "Bash(where uv)",
       "Bash(powershell:*)",
-      "Read(//c/Users/Oxidane/AppData/Roaming/uv/tools/ocr-cli/**)"
+      "Read(//c/Users/Oxidane/AppData/Roaming/uv/tools/ocr-cli/**)",
+      "Bash(find:*)"
     ],
     "deny": []
   }
