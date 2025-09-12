@@ -94,6 +94,16 @@ def add_output_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         help=f"Output directory for files (default: '{config.DEFAULT_MARKDOWN_OUTPUT_DIR}' in input directory)"
     )
     parser.add_argument(
+        "--preserve-structure", "-p",
+        action="store_true",
+        help="Preserve original directory structure in output (when processing directories)"
+    )
+    parser.add_argument(
+        "--no-recursive",
+        action="store_true",
+        help="Disable recursive search in directories (process only top-level files)"
+    )
+    parser.add_argument(
         "--quiet", "-q",
         action="store_true",
         help="Reduce output verbosity"

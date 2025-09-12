@@ -10,27 +10,20 @@ import time
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from ..utils import discover_files, load_ocr_model, add_common_ocr_args, add_output_args
+from ..utils import discover_files, load_ocr_model, add_common_ocr_args, add_output_args, get_directory_cache, get_output_file_path, setup_logging, BaseArgumentParser, configure_logging_level, check_input_path_exists
 from ..processors import OCRProcessor
 from .. import config, ocr_processor_wrapper
 
 
-def setup_logging():
-    """Configure logging for CLI usage."""
-    logging.basicConfig(
-        level=logging.INFO, 
-        format="%(asctime)s - %(levelname)s - %(message)s"
-    )
-
-
 def create_parser():
     """Create argument parser for extract command."""
-    parser = argparse.ArgumentParser(
-        description="Extract text from documents (PDF, images, Office docs) using intelligent dual-path processing.",
-        prog="ocr-extract"
+    parser = BaseArgumentParser.create_base_parser(
+        prog="ocr-extract",
+        description="Extract text from documents (PDF, images, Office docs) using intelligent dual-path processing."
     )
-    parser.add_argument(
-        "input_path", 
+    
+    BaseArgumentParser.add_input_path_argument(
+        parser, 
         help="Path to document file or directory containing supported documents"
     )
     
@@ -75,13 +68,8 @@ def main():
         logging.error("Cannot use both --ocr-only and --markitdown-only options")
         sys.exit(1)
     
-    # Configure logging level
-    if args.quiet:
-        logging.getLogger().setLevel(logging.WARNING)
-    elif args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-    else:
-        logging.getLogger().setLevel(logging.INFO)
+    # Configure logging
+    configure_logging_level(args)
 
     # Auto defaults for Chinese (CnOCR) mode: threads=8, batch_size=32 unless explicitly overridden
     if getattr(args, 'zh', False):
@@ -108,10 +96,17 @@ def main():
             model = load_ocr_model(args.det_arch, args.reco_arch, args.cpu)
         
         # Discover supported files
-        files, base_dir = discover_files(args.input_path)
+        recursive = not getattr(args, 'no_recursive', False)
+        files, base_dir, file_relative_paths = discover_files(args.input_path, recursive=recursive)
         if not files:
             logging.error("No supported files found to process.")
             sys.exit(1)
+        
+        # Display file discovery info
+        search_type = "recursively" if recursive else "non-recursively"
+        logging.info(f"Searching {search_type} - found {len(files)} files from: {args.input_path}")
+        if getattr(args, 'preserve_structure', False):
+            logging.info("Directory structure will be preserved in output")
         
         # Set up output directory
         output_dir = args.output_dir or os.path.join(base_dir, config.DEFAULT_MARKDOWN_OUTPUT_DIR)
@@ -133,10 +128,15 @@ def main():
         if args.profile:
             processing_mode += " [profile]"
         
+        # Get directory cache for optimized directory creation
+        dir_cache = get_directory_cache()
+        dir_cache.reset()  # Reset cache for this extraction session
+        
         # Process files
         total_files = len(files)
         successful_files = 0
         total_processing_time = 0
+        total_pages = 0  # Track page count
         method_stats = {'markitdown': 0, 'ocr': 0, 'failed': 0}
         
         logging.info(f"Processing {total_files} files using {processing_mode}...")
@@ -164,14 +164,30 @@ def main():
                 
                 total_processing_time += result_dict.get('processing_time', 0)
                 
+                # Track page count for statistics  
+                pages = result_dict.get('pages', 0)
+                if pages == 0:
+                    # Estimate pages if not available (assume at least 1 page per successful file)
+                    pages = 1 if result_dict.get('success', False) else 0
+                total_pages += pages
+                
                 if result_dict.get('success', False):
-                    # Save markdown output
-                    base_name = os.path.splitext(os.path.basename(file_path))[0]
-                    output_path = os.path.join(output_dir, f"{base_name}.md")
+                    # Get relative path for structure preservation
+                    relative_path = file_relative_paths.get(file_path, os.path.basename(file_path))
+                    
+                    # Save markdown output with optional structure preservation
+                    output_file_path = get_output_file_path(
+                        file_path,
+                        output_dir,
+                        preserve_structure=getattr(args, 'preserve_structure', False),
+                        relative_path=relative_path
+                    )
+                    # Use cached directory creation
+                    dir_cache.ensure_directory(os.path.dirname(output_file_path))
                     
                     content = result_dict.get('final_content') or result_dict.get('content', '')
                     
-                    with open(output_path, "w", encoding="utf-8") as f:
+                    with open(output_file_path, "w", encoding="utf-8") as f:
                         f.write(content)
                     
                     successful_files += 1
@@ -206,11 +222,15 @@ def main():
         print("📊 INTELLIGENT EXTRACTION SUMMARY")
         print("="*80)
         print(f"📁 Total files processed: {total_files}")
+        print(f"📄 Total pages processed: {total_pages}")
         print(f"✅ Successful extractions: {successful_files}")
         print(f"❌ Failed extractions: {method_stats['failed']}")
         print(f"🎯 Success rate: {(successful_files/total_files*100):.1f}%")
+        print(f"")
         print(f"⏱️  Total processing time: {total_processing_time:.2f}s")
         print(f"📊 Average time per file: {total_processing_time/total_files:.2f}s")
+        if total_pages > 0:
+            print(f"📊 Average time per page: {total_processing_time/total_pages:.2f}s")
         
         if not args.markitdown_only and not args.ocr_only:
             # Show method distribution for dual processing
@@ -230,7 +250,8 @@ def main():
                 if dual_stats.get('ocr_only', 0) > 0:
                     print(f"   🔍 OCR-only successes: {dual_stats['ocr_only']}")
         
-        print(f"\n📂 Output directory: {output_dir}")
+        structure_note = " (preserving directory structure)" if getattr(args, 'preserve_structure', False) else " (flat structure)"
+        print(f"\n📂 Output directory: {output_dir}{structure_note}")
         
         if successful_files == total_files:
             print("\n🎉 All files processed successfully!")

@@ -15,27 +15,14 @@ import time
 from pathlib import Path
 
 from .. import config
-from ..utils import discover_files, load_ocr_model, get_output_file_path, add_common_ocr_args, add_output_args, get_directory_cache, generate_file_tree
+from ..utils import discover_files, load_ocr_model, get_output_file_path, add_common_ocr_args, add_output_args, get_directory_cache, generate_file_tree, setup_logging, BaseArgumentParser, validate_common_arguments, configure_logging_level, check_input_path_exists
 
 import torch
 
 
-
-def setup_logging():
-    """Configure logging for CLI usage."""
-    logging.basicConfig(
-        level=logging.INFO, 
-        format="%(asctime)s - %(levelname)s - %(message)s"
-    )
-
-
 def create_parser():
     """Create argument parser for convert command."""
-    parser = argparse.ArgumentParser(
-        description="Convert documents to Markdown using advanced OCR",
-        prog="ocr-convert",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+    epilog = """
 Examples:
   # Convert single document
   ocr-convert document.docx
@@ -60,20 +47,20 @@ Supported formats:
   Data: .csv, .tsv, .json, .xml
   E-books: .epub
         """
+    
+    parser = BaseArgumentParser.create_base_parser(
+        prog="ocr-convert",
+        description="Convert documents to Markdown using advanced OCR",
+        epilog=epilog
     )
     
-    parser.add_argument(
-        "input_path", 
-        nargs='?',
+    BaseArgumentParser.add_input_path_argument(
+        parser, 
+        required=False, 
         help="Path to document file or directory containing documents"
     )
     
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=4,
-        help="Number of concurrent workers for batch processing (default: 4)"
-    )
+    BaseArgumentParser.add_workers_argument(parser, default=4)
     
     parser.add_argument(
         "--list-formats",
@@ -128,14 +115,8 @@ def validate_arguments(args):
         print("Error: input_path is required (unless using --list-formats)")
         return False
     
-    if args.workers < 1:
-        print("Error: --workers must be at least 1")
-        return False
-    
-    if args.workers > 16:
-        print("Warning: Using more than 16 workers may not improve performance")
-    
-    return True
+    # Use common validation
+    return validate_common_arguments(args)
 
 
 def main():
@@ -161,23 +142,16 @@ def main():
         parser.print_help()
         sys.exit(1)
     
-    # Configure logging level
-    if args.quiet:
-        logging.getLogger().setLevel(logging.WARNING)
-    elif args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-    else:
-        logging.getLogger().setLevel(logging.INFO)
-    
+    # Configure logging
     setup_logging()
+    configure_logging_level(args)
     
     try:
         # Record start time for performance monitoring
         conversion_start_time = time.time()
         
         # Validate input path
-        if not os.path.exists(args.input_path):
-            logging.error(f"Input path does not exist: {args.input_path}")
+        if not check_input_path_exists(args):
             sys.exit(1)
         
         # Discover files to process

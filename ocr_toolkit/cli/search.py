@@ -16,16 +16,7 @@ from doctr.io import DocumentFile
 from tqdm import tqdm
 
 from .. import config
-from ..utils import load_ocr_model, discover_pdf_files, add_common_ocr_args
-
-
-def setup_logging():
-    """Configure logging for CLI usage."""
-    logging.basicConfig(
-        level=logging.INFO, 
-        format="%(asctime)s - %(levelname)s - %(message)s"
-    )
-    logging.getLogger("ocrmypdf").setLevel(logging.ERROR)  # Suppress noisy ocrmypdf logs
+from ..utils import load_ocr_model, discover_pdf_files, add_common_ocr_args, setup_logging, BaseArgumentParser, configure_logging_level, check_input_path_exists
 
 
 def build_hocr(page_result, page_dims):
@@ -141,12 +132,13 @@ def process_pdf(input_pdf, output_pdf, model, args):
 
 def create_parser():
     """Create argument parser for search command."""
-    parser = argparse.ArgumentParser(
-        description="Create searchable PDFs from scanned PDF documents.",
-        prog="ocr-search"
+    parser = BaseArgumentParser.create_base_parser(
+        prog="ocr-search",
+        description="Create searchable PDFs from scanned PDF documents."
     )
-    parser.add_argument(
-        "input_path", 
+    
+    BaseArgumentParser.add_input_path_argument(
+        parser, 
         help="Path to PDF file or directory containing PDF files"
     )
     parser.add_argument(
@@ -177,8 +169,13 @@ def create_parser():
 def main():
     """Main entry point for ocr-search command."""
     setup_logging()
+    logging.getLogger("ocrmypdf").setLevel(logging.ERROR)  # Suppress noisy ocrmypdf logs
+    
     parser = create_parser()
     args = parser.parse_args()
+    
+    # Configure logging
+    configure_logging_level(args)
     
     try:
         # Load OCR model

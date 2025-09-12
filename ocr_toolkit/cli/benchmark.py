@@ -65,8 +65,8 @@ def main():
     parser = create_parser()
     args = parser.parse_args()
     
-    if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
+    # Configure logging
+    configure_logging_level(args)
     
     try:
         # Import benchmark module

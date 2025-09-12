@@ -89,18 +89,3 @@ def get_ocr_supported_formats() -> Set[str]:
         Set of OCR-supported file extensions
     """
     return SUPPORTED_PDF_FORMATS | SUPPORTED_IMAGE_FORMATS | SUPPORTED_OFFICE_FORMATS
-
-
-def get_markitdown_supported_formats() -> Set[str]:
-    """
-    Get file formats that can be processed by MarkItDown.
-    
-    Returns:
-        Set of MarkItDown-supported file extensions
-    """
-    return (SUPPORTED_PDF_FORMATS | 
-            SUPPORTED_OFFICE_FORMATS | 
-            SUPPORTED_TEXT_FORMATS |
-            SUPPORTED_OPENDOC_FORMATS |
-            SUPPORTED_DATA_FORMATS |
-            SUPPORTED_EBOOK_FORMATS)

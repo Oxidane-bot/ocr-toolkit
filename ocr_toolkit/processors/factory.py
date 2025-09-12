@@ -15,155 +15,95 @@ from ..config import get_all_supported_formats
 
 class ProcessorFactory:
     """
-    Factory class for creating document processors.
+    Simplified factory for creating OCR processors.
     
-    This factory manages the creation of different processor types
-    and handles processor selection based on file formats and requirements.
+    This factory creates OCR processors with minimal overhead,
+    focusing on the primary use case of OCR document processing.
     """
     
     def __init__(self):
         """Initialize the processor factory."""
-        self._processors: Dict[str, Type[FileProcessorBase]] = {}
-        self._processor_instances: Dict[str, FileProcessorBase] = {}
+        self._ocr_processor_class: Optional[Type[FileProcessorBase]] = None
         self.logger = logging.getLogger(__name__)
+        self._register_ocr_processor()
     
-    def register_processor(self, processor_type: str, processor_class: Type[FileProcessorBase]) -> None:
+    def _register_ocr_processor(self) -> None:
+        """Register the OCR processor class."""
+        try:
+            from .ocr_processor import OCRProcessor
+            self._ocr_processor_class = OCRProcessor
+            self.logger.debug("Registered OCR processor")
+        except ImportError as e:
+            self.logger.error(f"Could not register OCR processor: {e}")
+    
+    def create_ocr_processor(self, **kwargs) -> Optional[FileProcessorBase]:
         """
-        Register a processor class with the factory.
+        Create an OCR processor instance.
         
         Args:
-            processor_type: Unique identifier for the processor type
-            processor_class: The processor class to register
+            **kwargs: Arguments to pass to the OCR processor constructor
+            
+        Returns:
+            OCR processor instance or None if creation failed
         """
-        self._processors[processor_type] = processor_class
-        self.logger.debug(f"Registered processor: {processor_type}")
+        if not self._ocr_processor_class:
+            self.logger.error("OCR processor class not available")
+            return None
+        
+        try:
+            processor = self._ocr_processor_class(**kwargs)
+            self.logger.debug("Created OCR processor")
+            return processor
+        except Exception as e:
+            self.logger.error(f"Failed to create OCR processor: {e}")
+            return None
     
     def create_processor(self, processor_type: str, **kwargs) -> Optional[FileProcessorBase]:
         """
-        Create a processor instance of the specified type.
+        Create a processor instance (backward compatibility).
         
         Args:
-            processor_type: Type of processor to create
+            processor_type: Type of processor ('ocr' is the only supported type)
             **kwargs: Additional arguments to pass to the processor constructor
             
         Returns:
-            Processor instance or None if type not found
+            Processor instance or None if type not supported
         """
-        if processor_type not in self._processors:
-            self.logger.error(f"Unknown processor type: {processor_type}")
-            return None
+        if processor_type == 'ocr':
+            return self.create_ocr_processor(**kwargs)
         
-        try:
-            processor_class = self._processors[processor_type]
-            processor = processor_class(**kwargs)
-            self.logger.debug(f"Created processor: {processor_type}")
-            return processor
-        except Exception as e:
-            self.logger.error(f"Failed to create processor {processor_type}: {e}")
-            return None
-    
-    def get_or_create_processor(self, processor_type: str, **kwargs) -> Optional[FileProcessorBase]:
-        """
-        Get existing processor instance or create a new one.
-        
-        Args:
-            processor_type: Type of processor to get/create
-            **kwargs: Additional arguments for processor creation
-            
-        Returns:
-            Processor instance or None if creation failed
-        """
-        # Create cache key based on processor type and kwargs
-        cache_key = f"{processor_type}_{hash(frozenset(kwargs.items()))}"
-        
-        if cache_key not in self._processor_instances:
-            processor = self.create_processor(processor_type, **kwargs)
-            if processor:
-                self._processor_instances[cache_key] = processor
-            else:
-                return None
-        
-        return self._processor_instances[cache_key]
+        self.logger.error(f"Unsupported processor type: {processor_type}")
+        return None
     
     def get_processor_for_file(self, file_path: str, **kwargs) -> Optional[FileProcessorBase]:
         """
-        Get the appropriate processor for a file based on its extension.
+        Get the OCR processor for any supported file.
         
         Args:
             file_path: Path to the file to process
-            **kwargs: Additional arguments for processor selection/creation
+            **kwargs: Additional arguments for processor creation
             
         Returns:
-            Appropriate processor or None if no suitable processor found
+            OCR processor instance or None if file format not supported
         """
         file_ext = Path(file_path).suffix.lower()
         
-        # Check if file is supported
-        if file_ext not in get_all_supported_formats():
-            self.logger.warning(f"Unsupported file format: {file_ext}")
-            return None
-        
-        # Try to find appropriate processor
-        # This is a simplified implementation - can be extended with more sophisticated logic
-        
-        # OCR processor for images, PDFs, and Office documents
+        # Check if file is supported by OCR
         from ..config import get_ocr_supported_formats
         if file_ext in get_ocr_supported_formats():
-            return self.get_or_create_processor('ocr', **kwargs)
+            return self.create_ocr_processor(**kwargs)
         
-        # MarkItDown processor for other supported formats
-        from ..config import get_markitdown_supported_formats
-        if file_ext in get_markitdown_supported_formats():
-            return self.get_or_create_processor('markitdown', **kwargs)
-        
-        self.logger.warning(f"No suitable processor found for file: {file_path}")
+        self.logger.warning(f"Unsupported file format: {file_ext}")
         return None
     
-    def list_processors(self) -> Dict[str, Type[FileProcessorBase]]:
+    def is_ocr_available(self) -> bool:
         """
-        Get a dictionary of all registered processors.
+        Check if OCR processor is available.
         
         Returns:
-            Dictionary mapping processor types to their classes
+            True if OCR processor can be created, False otherwise
         """
-        return self._processors.copy()
-    
-    def clear_cache(self) -> None:
-        """Clear all cached processor instances."""
-        self._processor_instances.clear()
-        self.logger.debug("Cleared processor cache")
-    
-    def get_processor_info(self, processor_type: str) -> Optional[Dict[str, Any]]:
-        """
-        Get information about a registered processor.
-        
-        Args:
-            processor_type: Type of processor to get info for
-            
-        Returns:
-            Dictionary with processor information or None if not found
-        """
-        if processor_type not in self._processors:
-            return None
-        
-        processor_class = self._processors[processor_type]
-        
-        # Try to get supported formats from the class
-        supported_formats = []
-        try:
-            # Create a temporary instance to get supported formats
-            temp_instance = processor_class()
-            supported_formats = temp_instance.get_supported_formats()
-        except Exception as e:
-            self.logger.debug(f"Could not get supported formats for {processor_type}: {e}")
-        
-        return {
-            'type': processor_type,
-            'class': processor_class.__name__,
-            'module': processor_class.__module__,
-            'supported_formats': supported_formats,
-            'docstring': processor_class.__doc__
-        }
+        return self._ocr_processor_class is not None
 
 
 # Global factory instance
@@ -180,22 +120,4 @@ def get_processor_factory() -> ProcessorFactory:
     global _global_factory
     if _global_factory is None:
         _global_factory = ProcessorFactory()
-        _register_default_processors(_global_factory)
     return _global_factory
-
-
-def _register_default_processors(factory: ProcessorFactory) -> None:
-    """
-    Register default processors with the factory.
-    
-    Args:
-        factory: ProcessorFactory instance to register processors with
-    """
-    try:
-        # Register OCR processor
-        from .ocr_processor import OCRProcessor
-        factory.register_processor('ocr', OCRProcessor)
-    except ImportError as e:
-        logging.getLogger(__name__).warning(f"Could not register OCR processor: {e}")
-    
-    # MarkItDown processor has been removed - we now focus on OCR only

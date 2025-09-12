@@ -11,11 +11,13 @@ from .model_loader import load_ocr_model, get_device_info
 from .cli_args import add_common_ocr_args, add_output_args
 from .temp_file_manager import TempFileManager, get_temp_manager, cleanup_temp_files
 from .path_normalizer import PathNormalizer, get_path_normalizer, normalize_file_path
+from .cli_common import setup_logging, BaseArgumentParser, validate_common_arguments, configure_logging_level, check_input_path_exists, print_processing_summary
 
 __all__ = [
     'discover_files', 'discover_pdf_files', 'get_output_file_path', 'is_supported_file', 'get_supported_extensions', 'get_directory_cache', 'generate_file_tree',
     'load_ocr_model', 'get_device_info',
     'add_common_ocr_args', 'add_output_args',
     'TempFileManager', 'get_temp_manager', 'cleanup_temp_files',
-    'PathNormalizer', 'get_path_normalizer', 'normalize_file_path'
+    'PathNormalizer', 'get_path_normalizer', 'normalize_file_path',
+    'setup_logging', 'BaseArgumentParser', 'validate_common_arguments', 'configure_logging_level', 'check_input_path_exists', 'print_processing_summary'
 ]
