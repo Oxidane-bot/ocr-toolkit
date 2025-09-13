@@ -14,7 +14,7 @@ from unittest.mock import Mock
 import logging
 
 
-class TestFileManager:
+class FileManagerHelper:
     """
     Manages temporary test files and directories for testing.
     

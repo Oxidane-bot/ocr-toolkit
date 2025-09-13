@@ -5,7 +5,7 @@ Provides utilities, fixtures, and helper functions for testing.
 """
 
 from .test_utils import (
-    TestFileManager,
+    FileManagerHelper,
     create_mock_processing_result,
     create_test_directory_structure,
     suppress_logging,
@@ -18,7 +18,7 @@ from .test_utils import (
 )
 
 __all__ = [
-    'TestFileManager',
+    'FileManagerHelper',
     'create_mock_processing_result',
     'create_test_directory_structure',
     'suppress_logging',

@@ -21,8 +21,7 @@ TEST_FILES = {
     'pdf1': TEST_FILES_DIR / "instructions for writing 4-1.pdf",
     'pdf2': TEST_FILES_DIR / "lesson4.pdf", 
     'image1': TEST_FILES_DIR / "choice question.jpg",
-    'image2': TEST_FILES_DIR / "discussion 4 instructions.jpg",
-    'doc': TEST_FILES_DIR / "Synthesis_Matrix_Template - for practice writing 4-2.doc"
+    'image2': TEST_FILES_DIR / "discussion 4 instructions.jpg"
 }
 
 
