@@ -139,7 +139,9 @@ class OCRProcessor(FileProcessorBase):
             # Image files
             '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif',
             # Office documents (converted to PDF first)
-            '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx'
+            '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx',
+            # Text files (direct copy)
+            '.txt', '.md', '.rtf'
         ]
     
     def supports_format(self, file_extension: str) -> bool:
@@ -170,6 +172,16 @@ class OCRProcessor(FileProcessorBase):
             
             if not self.supports_format(ext):
                 result.error = f'Unsupported file format for OCR: {ext}'
+                result.processing_time = time.time() - start_time
+                return result
+            
+            # Handle text files directly (no OCR needed)
+            if ext in ['.txt', '.md', '.rtf']:
+                content = self._process_text_file(file_path, ext)
+                result.content = content
+                result.success = True
+                result.pages = 1
+                self.logger.debug(f"Processed text file {file_path} successfully")
                 result.processing_time = time.time() - start_time
                 return result
             
@@ -401,3 +413,46 @@ class OCRProcessor(FileProcessorBase):
             return self._process_with_ocr(doc, file_path, ext)
         
         return "\n\n".join(markdown_content)
+    
+    def _process_text_file(self, file_path: str, ext: str) -> str:
+        """
+        Process text file by reading its content directly.
+        
+        Args:
+            file_path: Path to the text file
+            ext: File extension
+            
+        Returns:
+            File content as markdown string
+        """
+        try:
+            # Handle Chinese path encoding issues on Windows
+            normalized_path = self.path_normalizer.normalize_path(file_path)
+            
+            # Read the file content
+            with open(normalized_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # For markdown files, return content as-is
+            if ext == '.md':
+                return content
+            
+            # For other text files, wrap in markdown format
+            filename = os.path.basename(file_path)
+            return f"# {filename}\n\n{content}"
+            
+        except UnicodeDecodeError:
+            # Try different encodings if UTF-8 fails
+            try:
+                with open(normalized_path, 'r', encoding='gbk') as f:
+                    content = f.read()
+                filename = os.path.basename(file_path)
+                if ext == '.md':
+                    return content
+                return f"# {filename}\n\n{content}"
+            except:
+                self.logger.error(f"Failed to read text file with UTF-8 or GBK encoding: {file_path}")
+                raise
+        except Exception as e:
+            self.logger.error(f"Failed to read text file {file_path}: {e}")
+            raise
