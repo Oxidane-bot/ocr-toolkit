@@ -172,7 +172,7 @@ class PowerPointComStrategy(ConversionStrategy):
             
             # Create PowerPoint application
             powerpoint = win32com.client.Dispatch("PowerPoint.Application")
-            powerpoint.Visible = False
+            powerpoint.Visible = 1  # PowerPoint needs to be visible for some operations
             
             # Open presentation
             presentation = powerpoint.Presentations.Open(
@@ -182,32 +182,42 @@ class PowerPointComStrategy(ConversionStrategy):
                 WithWindow=False
             )
             
-            # Export as PDF (format 32 = PDF)
-            presentation.ExportAsFixedFormat(
-                Path=os.path.abspath(output_path),
-                FixedFormatType=2,  # PDF format
-                Intent=1,  # Print intent
-                FrameSlides=0,  # Don't frame slides
-                HandoutOrder=1,
-                OutputType=0  # All slides
+            # Use SaveAs method with PDF format (more reliable than ExportAsFixedFormat)
+            presentation.SaveAs(
+                os.path.abspath(output_path), 
+                32  # PDF format
             )
             
             result['success'] = True
             logging.info(f"Successfully converted {input_path} to PDF using PowerPoint COM")
             
         except Exception as e:
-            result['error'] = str(e)
+            result['error'] = f"PowerPoint COM conversion error: {str(e)}"
             logging.error(f"PowerPoint COM conversion failed for {input_path}: {e}")
+            
+            # Provide more specific error context
+            if "file format" in str(e).lower():
+                result['error'] += " (File format may be corrupted or unsupported)"
+            elif "automation" in str(e).lower() or "dispatch" in str(e).lower():
+                result['error'] += " (PowerPoint application not available or COM error)"
+            elif "access" in str(e).lower() or "permission" in str(e).lower():
+                result['error'] += " (File access denied - check if file is open in another application)"
         
         finally:
-            # Clean up COM objects
+            # Clean up COM objects with better error handling
             try:
                 if presentation:
                     presentation.Close()
+                    logging.debug("Closed PowerPoint presentation")
+            except Exception as e:
+                logging.debug(f"Error closing presentation: {e}")
+            
+            try:
                 if powerpoint:
                     powerpoint.Quit()
-            except:
-                pass
+                    logging.debug("Quit PowerPoint application")
+            except Exception as e:
+                logging.debug(f"Error quitting PowerPoint: {e}")
         
         result['processing_time'] = time.time() - start_time
         return result
