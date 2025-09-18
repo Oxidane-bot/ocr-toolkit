@@ -283,7 +283,7 @@ def discover_pdf_files(input_path: str) -> Tuple[List[str], str]:
     return files, base_dir
 
 
-def get_output_file_path(input_path: str, output_dir: Optional[str] = None, preserve_structure: bool = False, relative_path: Optional[str] = None) -> str:
+def get_output_file_path(input_path: str, output_dir: Optional[str] = None, preserve_structure: bool = False, relative_path: Optional[str] = None, base_dir: Optional[str] = None) -> str:
     """
     Determine the output file path for a converted Markdown document.
     
@@ -293,10 +293,11 @@ def get_output_file_path(input_path: str, output_dir: Optional[str] = None, pres
     Args:
         input_path: The full path to the input document
         output_dir: The directory to save the output file. 
-                   If None, a default directory is created in the input file's directory
+                   If None, a default directory is created based on the mode
         preserve_structure: Whether to preserve the original directory structure
         relative_path: The relative path of the file from the base directory
                       (used when preserve_structure=True)
+        base_dir: The base directory for the project (used when preserve_structure=True)
 
     Returns:
         The full path to the output Markdown file
@@ -320,11 +321,12 @@ def get_output_file_path(input_path: str, output_dir: Optional[str] = None, pres
             output_path = output_dir_obj / output_filename
     else:
         # Use the default output directory from config
-        input_file_dir = input_path_obj.parent
-        default_output_dir = input_file_dir / config.DEFAULT_MARKDOWN_OUTPUT_DIR
-        
-        if preserve_structure and relative_path:
-            # Preserve structure within default output directory
+        if preserve_structure and relative_path and base_dir:
+            # For preserve structure mode, use the input base directory
+            # This ensures all files with preserved structure go to a unified location
+            # within the input directory's root
+            base_dir_obj = Path(base_dir)
+            default_output_dir = base_dir_obj / config.DEFAULT_MARKDOWN_OUTPUT_DIR
             rel_path_obj = Path(relative_path)
             rel_dir = rel_path_obj.parent
             if rel_dir != Path('.'):
@@ -332,7 +334,9 @@ def get_output_file_path(input_path: str, output_dir: Optional[str] = None, pres
             else:
                 output_path = default_output_dir / output_filename
         else:
-            # Flat structure in default directory
+            # Use input file's parent directory for default location (original behavior)
+            input_file_dir = input_path_obj.parent
+            default_output_dir = input_file_dir / config.DEFAULT_MARKDOWN_OUTPUT_DIR
             output_path = default_output_dir / output_filename
         
     return str(output_path)

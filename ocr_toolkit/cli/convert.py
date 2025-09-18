@@ -196,8 +196,12 @@ def main():
         
         # Display output directory structure preview for preserve structure mode
         if args.preserve_structure and len(files_to_process) > 1:
-            # Determine output directory for preview
-            output_directory = args.output_dir if args.output_dir else os.path.join(base_dir, config.DEFAULT_MARKDOWN_OUTPUT_DIR)
+            # Determine output directory for preview - must match get_output_file_path logic
+            if args.output_dir:
+                output_directory = args.output_dir
+            else:
+                # For preserve structure mode, use input base directory
+                output_directory = os.path.join(base_dir, config.DEFAULT_MARKDOWN_OUTPUT_DIR)
             
             logging.info("Directory structure preview:")
             logging.info(f"  Input base: {base_dir}")
@@ -246,7 +250,8 @@ def main():
                         file_path, 
                         args.output_dir, 
                         preserve_structure=args.preserve_structure,
-                        relative_path=relative_path
+                        relative_path=relative_path,
+                        base_dir=base_dir
                     )
                     
                     # Use cached directory creation
@@ -330,12 +335,17 @@ def main():
         if 'success_rate' in stats:
             print(f"  Success rate: {stats['success_rate']:.1f}%")
         
-        # Determine output directory
+        # Determine output directory for display - must match get_output_file_path logic
         if args.preserve_structure:
             structure_note = " (preserving directory structure)"
+            if args.output_dir:
+                output_directory = args.output_dir
+            else:
+                # For preserve structure mode, use input base directory
+                output_directory = os.path.join(base_dir, config.DEFAULT_MARKDOWN_OUTPUT_DIR)
         else:
             structure_note = " (flat structure)"
-        output_directory = args.output_dir if args.output_dir else os.path.join(base_dir, config.DEFAULT_MARKDOWN_OUTPUT_DIR)
+            output_directory = args.output_dir if args.output_dir else os.path.join(base_dir, config.DEFAULT_MARKDOWN_OUTPUT_DIR)
         print(f"Output directory: {output_directory}{structure_note}")
         
         # Display structure preservation summary for preserve structure mode

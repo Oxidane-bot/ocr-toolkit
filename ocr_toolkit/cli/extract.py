@@ -180,7 +180,8 @@ def main():
                         file_path,
                         output_dir,
                         preserve_structure=getattr(args, 'preserve_structure', False),
-                        relative_path=relative_path
+                        relative_path=relative_path,
+                        base_dir=base_dir
                     )
                     # Use cached directory creation
                     dir_cache.ensure_directory(os.path.dirname(output_file_path))
