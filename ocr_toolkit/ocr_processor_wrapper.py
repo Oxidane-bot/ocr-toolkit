@@ -3,9 +3,9 @@ OCR Processor Wrapper that provides enhanced OCR processing capabilities.
 """
 
 import logging
-import time
 import os
-from typing import Dict, Any, Optional
+import time
+from typing import Any
 
 from .processors import get_processor_factory
 from .utils import get_temp_manager
@@ -14,15 +14,15 @@ from .utils import get_temp_manager
 class OCRProcessorWrapper:
     """
     OCR Processor Wrapper that provides enhanced OCR processing capabilities.
-    
+
     This wrapper provides a simplified interface for OCR processing using
     the factory pattern for processor management.
     """
-    
+
     def __init__(self, ocr_model, batch_size: int = 16, use_zh: bool = False):
         """
         Initialize the OCR processor wrapper.
-        
+
         Args:
             ocr_model: Loaded DocTR OCR model
             batch_size: Batch size for OCR processing
@@ -33,7 +33,7 @@ class OCRProcessorWrapper:
         self.use_zh = use_zh
         self.logger = logging.getLogger(__name__)
         self.temp_manager = get_temp_manager()
-        
+
         # Get processor factory and create OCR processor
         self.factory = get_processor_factory()
         self.processor = self.factory.create_processor(
@@ -42,31 +42,31 @@ class OCRProcessorWrapper:
             batch_size=batch_size,
             use_cnocr=use_zh
         )
-        
+
         if not self.processor:
             raise RuntimeError("Failed to create OCR processor")
-    
-    def process_document(self, file_path: str, args=None) -> Dict[str, Any]:
+
+    def process_document(self, file_path: str, args=None) -> dict[str, Any]:
         """
         Process document with OCR.
-        
+
         Args:
             file_path: Path to the document
             args: Command line arguments (optional)
-            
+
         Returns:
             Result dictionary with processing information
         """
         start_time = time.time()
-        
+
         try:
             # Process with OCR processor
             result = self.processor.process(
-                file_path, 
+                file_path,
                 fast=getattr(args, 'fast', False) if args else False,
                 pages=getattr(args, 'pages', None) if args else None
             )
-            
+
             # Convert to legacy format for compatibility
             return {
                 'file_path': file_path,
@@ -81,7 +81,7 @@ class OCRProcessorWrapper:
                 'temp_files': result.temp_files,
                 'error': result.error if not result.success else ''
             }
-            
+
         except Exception as e:
             self.logger.error(f"OCR processing failed for {file_path}: {e}")
             return {
@@ -101,12 +101,12 @@ class OCRProcessorWrapper:
                 'temp_files': [],
                 'error': str(e)
             }
-    
-    def get_statistics(self) -> Dict[str, Any]:
+
+    def get_statistics(self) -> dict[str, Any]:
         """Get basic processing statistics."""
         return {'ocr_processed': 1, 'success_rate': 100.0}
-    
-    def get_detailed_statistics(self) -> Dict[str, Any]:
+
+    def get_detailed_statistics(self) -> dict[str, Any]:
         """Get comprehensive processing statistics."""
         return self.get_statistics()
 
@@ -114,12 +114,12 @@ class OCRProcessorWrapper:
 def create_ocr_processor_wrapper(ocr_model, batch_size: int = 16, use_zh: bool = False) -> OCRProcessorWrapper:
     """
     Create an OCR processor wrapper instance.
-    
+
     Args:
         ocr_model: Loaded DocTR OCR model
         batch_size: Batch size for OCR processing
         use_zh: Whether to use CnOCR for Chinese text recognition
-        
+
     Returns:
         OCRProcessorWrapper instance
     """

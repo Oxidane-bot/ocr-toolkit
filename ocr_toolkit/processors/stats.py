@@ -5,15 +5,15 @@ This module provides a dedicated class for tracking processing statistics,
 separating this concern from the main processing logic.
 """
 
-from typing import Dict, Any
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
 class ProcessingStats:
     """
     Tracks statistics for document processing operations.
-    
+
     This class provides a centralized way to track processing metrics
     for OCR and other document processing methods.
     """
@@ -22,12 +22,12 @@ class ProcessingStats:
     failed_processed: int = 0
     total_processing_time: float = 0.0
     total_pages: int = 0
-    method_stats: Dict[str, int] = field(default_factory=dict)
-    
+    method_stats: dict[str, int] = field(default_factory=dict)
+
     def add_result(self, method: str, success: bool, processing_time: float = 0.0, pages: int = 0):
         """
         Add a processing result to the statistics.
-        
+
         Args:
             method: Processing method used ('ocr', 'cnocr', etc.)
             success: Whether processing was successful
@@ -37,22 +37,22 @@ class ProcessingStats:
         self.total_processed += 1
         self.total_processing_time += processing_time
         self.total_pages += pages
-        
+
         if success:
             self.successful_processed += 1
         else:
             self.failed_processed += 1
-        
+
         # Track method-specific statistics
         if method in self.method_stats:
             self.method_stats[method] += 1
         else:
             self.method_stats[method] = 1
-    
-    def get_summary(self) -> Dict[str, Any]:
+
+    def get_summary(self) -> dict[str, Any]:
         """
         Get a comprehensive summary of processing statistics.
-        
+
         Returns:
             Dictionary with calculated statistics and percentages
         """
@@ -66,9 +66,9 @@ class ProcessingStats:
                 'total_processing_time': 0.0,
                 'method_stats': {}
             }
-        
+
         average_time_per_page = (self.total_processing_time / self.total_pages) if self.total_pages > 0 else 0.0
-        
+
         return {
             'total_processed': self.total_processed,
             'successful_processed': self.successful_processed,
@@ -80,7 +80,7 @@ class ProcessingStats:
             'total_processing_time': self.total_processing_time,
             'method_stats': self.method_stats.copy()
         }
-    
+
     def reset(self):
         """Reset all statistics to zero."""
         self.total_processed = 0

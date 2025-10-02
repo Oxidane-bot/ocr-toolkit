@@ -5,16 +5,14 @@ CLI for OCR performance benchmarking.
 import argparse
 import logging
 import sys
-import os
 
-from .. import config
-from ..utils import discover_pdf_files, add_common_ocr_args
+from ..utils import add_common_ocr_args, configure_logging_level, discover_pdf_files
 
 
 def setup_logging():
     """Configure logging for CLI usage."""
     logging.basicConfig(
-        level=logging.INFO, 
+        level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s"
     )
 
@@ -26,7 +24,7 @@ def create_parser():
         prog="ocr-bench"
     )
     parser.add_argument(
-        "input_path", 
+        "input_path",
         help="Path to directory containing PDF files for benchmarking"
     )
     parser.add_argument(
@@ -52,10 +50,10 @@ def create_parser():
         action="store_true",
         help="Enable verbose output"
     )
-    
+
     # Add common OCR arguments
     add_common_ocr_args(parser)
-    
+
     return parser
 
 
@@ -64,33 +62,33 @@ def main():
     setup_logging()
     parser = create_parser()
     args = parser.parse_args()
-    
+
     # Configure logging
     configure_logging_level(args)
-    
+
     try:
         # Import benchmark module
         from .. import benchmark
-        
+
         # Discover PDF files
         pdf_files, base_dir = discover_pdf_files(args.input_path)
         if not pdf_files:
             logging.error("No PDF files found for benchmarking.")
             sys.exit(1)
-        
+
         # Apply file limit if specified
         if args.file_limit:
             pdf_files = pdf_files[:args.file_limit]
             logging.info(f"Limited to first {len(pdf_files)} files")
-        
-        logging.info(f"Starting OCR benchmark...")
+
+        logging.info("Starting OCR benchmark...")
         logging.info(f"Detection model: {args.det_arch}")
         logging.info(f"Recognition model: {args.reco_arch}")
         logging.info(f"Batch size: {args.batch_size}")
         logging.info(f"Workers: {args.workers}")
         logging.info(f"Using {'GPU' if not args.cpu else 'CPU'}")
         logging.info(f"Found {len(pdf_files)} PDF files to process")
-        
+
         # Run benchmark
         results = benchmark.run_benchmark(
             pdf_files=pdf_files,
@@ -101,7 +99,7 @@ def main():
             use_cpu=args.cpu,
             timeout=args.timeout
         )
-        
+
         # Print results summary
         print("\n" + "="*60)
         print("BENCHMARK REPORT")
@@ -116,9 +114,9 @@ def main():
             print(f"Fastest file: {min(results['processing_times']):.2f}s")
             print(f"Slowest file: {max(results['processing_times']):.2f}s")
         print("="*60)
-        
+
         logging.info("Benchmark completed successfully")
-        
+
     except (FileNotFoundError, ValueError) as e:
         logging.error(f"Error: {e}")
         sys.exit(1)

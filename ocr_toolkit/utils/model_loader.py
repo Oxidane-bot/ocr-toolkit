@@ -5,9 +5,10 @@ This module provides utilities for loading and configuring OCR models
 with appropriate device selection and configuration.
 """
 
-import torch
 import logging
-from typing import Dict, Any
+from typing import Any
+
+import torch
 from doctr.models import ocr_predictor
 
 from .. import config
@@ -35,9 +36,9 @@ def load_ocr_model(det_arch: str = None, reco_arch: str = None, use_cpu: bool = 
     # Use defaults from config if not specified
     det_arch = det_arch or config.DEFAULT_DET_ARCH
     reco_arch = reco_arch or config.DEFAULT_RECO_ARCH
-    
+
     logging.info(f"Loading model with det_arch='{det_arch}' and reco_arch='{reco_arch}'...")
-    
+
     use_gpu = not use_cpu and torch.cuda.is_available()
 
     if use_gpu:
@@ -51,10 +52,10 @@ def load_ocr_model(det_arch: str = None, reco_arch: str = None, use_cpu: bool = 
     return model
 
 
-def get_device_info() -> Dict[str, Any]:
+def get_device_info() -> dict[str, Any]:
     """
     Get information about available compute devices.
-    
+
     Returns:
         Dictionary with device information
     """

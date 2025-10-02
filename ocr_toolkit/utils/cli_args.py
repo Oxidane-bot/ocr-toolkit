@@ -6,6 +6,7 @@ to argparse parsers across different CLI commands.
 """
 
 import argparse
+
 from .. import config
 
 
@@ -29,8 +30,8 @@ def add_common_ocr_args(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
         help="Number of pages to process at a time"
     )
     parser.add_argument(
-        "--cpu", 
-        action="store_true", 
+        "--cpu",
+        action="store_true",
         help="Force use of CPU even if CUDA is available"
     )
     parser.add_argument(
@@ -80,10 +81,10 @@ def add_common_ocr_args(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
 def add_output_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """
     Add common output-related arguments to an argparse parser.
-    
+
     Args:
         parser: The argument parser to add arguments to
-        
+
     Returns:
         The parser with added arguments
     """

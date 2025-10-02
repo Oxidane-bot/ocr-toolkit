@@ -5,7 +5,6 @@ This module contains default configuration values used across the OCR toolkit,
 including model architectures, processing parameters, output directories, and supported file formats.
 """
 
-from typing import Set
 
 # Default OCR model architectures
 DEFAULT_DET_ARCH = "linknet_resnet18"
@@ -65,26 +64,26 @@ SUPPORTED_EBOOK_FORMATS = {'.epub'}
 """Set[str]: E-book formats supported by MarkItDown."""
 
 
-def get_all_supported_formats() -> Set[str]:
+def get_all_supported_formats() -> set[str]:
     """
     Get the complete set of all supported file formats.
-    
+
     Returns:
         Set of all supported file extensions
     """
-    return (SUPPORTED_PDF_FORMATS | 
-            SUPPORTED_IMAGE_FORMATS | 
-            SUPPORTED_OFFICE_FORMATS | 
+    return (SUPPORTED_PDF_FORMATS |
+            SUPPORTED_IMAGE_FORMATS |
+            SUPPORTED_OFFICE_FORMATS |
             SUPPORTED_TEXT_FORMATS |
             SUPPORTED_OPENDOC_FORMATS |
             SUPPORTED_DATA_FORMATS |
             SUPPORTED_EBOOK_FORMATS)
 
 
-def get_ocr_supported_formats() -> Set[str]:
+def get_ocr_supported_formats() -> set[str]:
     """
     Get file formats that can be processed by OCR.
-    
+
     Returns:
         Set of OCR-supported file extensions
     """
