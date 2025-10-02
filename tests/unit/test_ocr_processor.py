@@ -72,11 +72,17 @@ class TestOCRProcessor:
         assert self.processor.supports_format(".docx") == True
         assert self.processor.supports_format(".pptx") == True
         assert self.processor.supports_format(".xlsx") == True
-        
+
+    def test_supports_format_text_files(self):
+        """Test format support for text files."""
+        assert self.processor.supports_format(".txt") == True
+        assert self.processor.supports_format(".md") == True
+        assert self.processor.supports_format(".rtf") == True
+
     def test_supports_format_unsupported(self):
         """Test format support for unsupported files."""
-        assert self.processor.supports_format(".txt") == False
         assert self.processor.supports_format(".xyz") == False
+        assert self.processor.supports_format(".unknown") == False
         
     def test_get_supported_formats(self):
         """Test getting list of supported formats."""
