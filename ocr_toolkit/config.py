@@ -34,6 +34,30 @@ Larger values may improve throughput but require more memory.
 DEFAULT_WORKERS = 4
 """int: Default number of concurrent workers for batch processing."""
 
+# Display and UI constants
+MAX_TREE_DISPLAY_SMALL = 10
+"""int: Maximum files to show in tree view for small file counts."""
+
+MAX_TREE_DISPLAY_MEDIUM = 20
+"""int: Maximum files to show in tree view for medium file counts."""
+
+MAX_TREE_DISPLAY_LARGE = 25
+"""int: Maximum files to show when user explicitly requests full display."""
+
+# Quality evaluation thresholds
+QUALITY_SPECIAL_CHAR_THRESHOLD = 0.05
+"""float: Maximum ratio of special characters (5%) before quality penalty."""
+
+QUALITY_SHORT_WORD_THRESHOLD = 0.3
+"""float: Maximum ratio of very short words (30%) before quality penalty."""
+
+# Path and encoding constants
+ASCII_BOUNDARY = 127
+"""int: Character code boundary for ASCII/non-ASCII detection."""
+
+MAX_RELATIVE_PATH_LENGTH = 200
+"""int: Maximum safe relative path length (Windows has 260 char limit)."""
+
 # Default output subdirectory names
 DEFAULT_MARKDOWN_OUTPUT_DIR = "markdown_output"
 """str: Default subdirectory name for markdown output files."""

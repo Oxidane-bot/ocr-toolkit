@@ -10,6 +10,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from . import config
+
 
 class QualityEvaluator:
     """Evaluates and compares the quality of document processing results."""
@@ -88,7 +90,7 @@ class QualityEvaluator:
 
         # Detect excessive special characters
         special_char_ratio = len(re.findall(r'[^\w\s\n.,!?;:()\[\]{}""''-]', text)) / len(text)
-        if special_char_ratio > 0.05:  # More than 5% special chars
+        if special_char_ratio > config.QUALITY_SPECIAL_CHAR_THRESHOLD:
             error_penalty *= 0.9
 
         # Detect very short "words" (potential OCR artifacts)
@@ -96,7 +98,7 @@ class QualityEvaluator:
         if words:
             very_short_words = len([w for w in words if len(w) == 1])
             short_word_ratio = very_short_words / len(words)
-            if short_word_ratio > 0.3:  # More than 30% single-char words
+            if short_word_ratio > config.QUALITY_SHORT_WORD_THRESHOLD:
                 error_penalty *= 0.7
 
         # 5. Calculate total score

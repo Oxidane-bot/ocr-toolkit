@@ -7,6 +7,8 @@ in a visual format, supporting the preserve structure mode of OCR processing.
 
 from pathlib import Path
 
+from .. import config
+
 
 def generate_file_tree(file_relative_paths: dict[str, str], show_all: bool = True, max_display: int = 15) -> str:
     """
@@ -26,11 +28,11 @@ def generate_file_tree(file_relative_paths: dict[str, str], show_all: bool = Tru
     total_files = len(file_relative_paths)
 
     # Smart display strategy based on file count
-    if total_files <= 10:
+    if total_files <= config.MAX_TREE_DISPLAY_SMALL:
         # Small count: show everything
         display_mode = "full"
         files_to_show = total_files
-    elif total_files <= 20:
+    elif total_files <= config.MAX_TREE_DISPLAY_MEDIUM:
         # Medium count: show limited with tree
         display_mode = "limited"
         files_to_show = 12
@@ -40,7 +42,7 @@ def generate_file_tree(file_relative_paths: dict[str, str], show_all: bool = Tru
         files_to_show = 8
 
     # Override with user preference
-    if show_all and total_files <= 25:
+    if show_all and total_files <= config.MAX_TREE_DISPLAY_LARGE:
         display_mode = "full"
         files_to_show = total_files
     elif not show_all:
@@ -81,7 +83,7 @@ def generate_file_tree(file_relative_paths: dict[str, str], show_all: bool = Tru
     # Generate tree display based on mode
     lines = []
 
-    if display_mode == "compact" and total_files > 20:
+    if display_mode == "compact" and total_files > config.MAX_TREE_DISPLAY_MEDIUM:
         # Compact mode: show structure summary
         _build_compact_tree(tree, lines, total_files, files_to_show)
     else:

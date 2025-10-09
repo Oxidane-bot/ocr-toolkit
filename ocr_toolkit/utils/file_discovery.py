@@ -219,7 +219,7 @@ def discover_files(input_path: str, recursive: bool = True, max_depth: int = 50)
             logging.warning(f"Potentially unsafe relative path detected: {rel_path} for file {file_path}")
 
         # Check for excessively long paths (Windows has 260 char limit)
-        if len(rel_path) > 200:  # Conservative limit to account for output directory path
+        if len(rel_path) > config.MAX_RELATIVE_PATH_LENGTH:
             logging.warning(f"Relative path may be too long ({len(rel_path)} chars): {rel_path}")
 
         # Check for empty or problematic relative paths
@@ -317,24 +317,23 @@ def get_output_file_path(input_path: str, output_dir: str | None = None, preserv
         else:
             # Flat structure: all files in the same output directory
             output_path = output_dir_obj / output_filename
-    else:
-        # Use the default output directory from config
-        if preserve_structure and relative_path and base_dir:
-            # For preserve structure mode, use the input base directory
-            # This ensures all files with preserved structure go to a unified location
-            # within the input directory's root
-            base_dir_obj = Path(base_dir)
-            default_output_dir = base_dir_obj / config.DEFAULT_MARKDOWN_OUTPUT_DIR
-            rel_path_obj = Path(relative_path)
-            rel_dir = rel_path_obj.parent
-            if rel_dir != Path('.'):
-                output_path = default_output_dir / rel_dir / output_filename
-            else:
-                output_path = default_output_dir / output_filename
+    # Use the default output directory from config
+    elif preserve_structure and relative_path and base_dir:
+        # For preserve structure mode, use the input base directory
+        # This ensures all files with preserved structure go to a unified location
+        # within the input directory's root
+        base_dir_obj = Path(base_dir)
+        default_output_dir = base_dir_obj / config.DEFAULT_MARKDOWN_OUTPUT_DIR
+        rel_path_obj = Path(relative_path)
+        rel_dir = rel_path_obj.parent
+        if rel_dir != Path('.'):
+            output_path = default_output_dir / rel_dir / output_filename
         else:
-            # Use input file's parent directory for default location (original behavior)
-            input_file_dir = input_path_obj.parent
-            default_output_dir = input_file_dir / config.DEFAULT_MARKDOWN_OUTPUT_DIR
             output_path = default_output_dir / output_filename
+    else:
+        # Use input file's parent directory for default location (original behavior)
+        input_file_dir = input_path_obj.parent
+        default_output_dir = input_file_dir / config.DEFAULT_MARKDOWN_OUTPUT_DIR
+        output_path = default_output_dir / output_filename
 
     return str(output_path)

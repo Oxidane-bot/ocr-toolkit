@@ -11,10 +11,12 @@ import os
 import sys
 import time
 import warnings
+from argparse import Namespace
 
 import torch
 
 from .. import config
+from .. import ocr_processor_wrapper
 from ..utils import (
     BaseArgumentParser,
     add_common_ocr_args,
@@ -136,10 +138,6 @@ def main():
     warnings.filterwarnings("ignore", message="Cannot set non-stroke color because 2 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported", module="pypdf")
     warnings.filterwarnings("ignore", message="Could get FontBBox from font descriptor because None cannot be parsed as 4 floats", module="pypdf")
 
-    from argparse import Namespace
-
-    from .. import ocr_processor_wrapper
-
     parser = create_parser()
     args = parser.parse_args()
 
@@ -220,7 +218,7 @@ def main():
             logging.info("")
 
             # Generate and display file tree
-            tree_display = generate_file_tree(file_relative_paths, show_all=len(files_to_process) <= 20)
+            tree_display = generate_file_tree(file_relative_paths, show_all=len(files_to_process) <= config.MAX_TREE_DISPLAY_MEDIUM)
             logging.info("Output file tree:")
             for line in tree_display.split('\n'):
                 if line.strip():  # Skip empty lines

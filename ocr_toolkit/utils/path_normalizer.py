@@ -13,6 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from .. import config
 from ..utils.temp_file_manager import get_temp_manager
 
 
@@ -205,7 +206,7 @@ class PathNormalizer:
             Normalized path for Windows
         """
         # Check if path contains Chinese or other non-ASCII characters
-        has_non_ascii = any(ord(char) > 127 for char in file_path)
+        has_non_ascii = any(ord(char) > config.ASCII_BOUNDARY for char in file_path)
 
         if has_non_ascii:
             self.logger.info("Detected non-ASCII characters in path, creating temporary copy")
@@ -283,7 +284,7 @@ class PathNormalizer:
 
         # Check for non-ASCII characters on Windows
         if os.name == 'nt':
-            return any(ord(char) > 127 for char in file_path)
+            return any(ord(char) > config.ASCII_BOUNDARY for char in file_path)
 
         # On other systems, check for other potential issues
         problematic_chars = ['<', '>', ':', '"', '|', '?', '*']
