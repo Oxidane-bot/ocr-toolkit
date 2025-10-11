@@ -8,6 +8,7 @@ the FileProcessorBase interface for consistent behavior.
 import logging
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from doctr.io import DocumentFile
@@ -311,52 +312,56 @@ class OCRProcessor(FileProcessorBase):
 
         try:
             # Convert all pages to images for batch processing
-            page_images = []
-            for page in doc:
-                if hasattr(page, 'numpy'):
-                    # For PDF pages, convert to numpy array
-                    page_img = page.numpy()
-                else:
-                    # For image files, use the image directly
-                    page_img = page
-                page_images.append(page_img)
+            page_images = [
+                page.numpy() if hasattr(page, 'numpy') else page
+                for page in doc
+            ]
 
-            # Process pages in batches using image_list functionality
-            batch_size = min(1, len(page_images))  # Process 1 page at a time (single page processing)
+            # Multi-threaded processing with optimal thread count for GPU
+            # Since CnOCR uses ONNX Runtime which releases GIL, we can use threading
+            # Use 4 threads as optimal for GPU to avoid context switching overhead
+            NUM_THREADS = 4
+            batch_size = min(self.batch_size, len(page_images))
 
+            # Process function for each page
+            def process_single_page(page_idx_and_img):
+                page_idx, img = page_idx_and_img
+                try:
+                    # Pass rec_batch_size to enable batch processing of detected text boxes
+                    ocr_result = self.cnocr.ocr(img, rec_batch_size=self.batch_size)
+                    return (page_idx, ocr_result, None)
+                except Exception as e:
+                    self.logger.warning(f"CnOCR recognition failed for page {page_idx + 1}: {e}")
+                    return (page_idx, [], str(e))
+
+            # Process in batches using ThreadPoolExecutor with limited workers
             for batch_start in range(0, len(page_images), batch_size):
                 batch_end = min(batch_start + batch_size, len(page_images))
                 batch_images = page_images[batch_start:batch_end]
 
-                self.logger.debug(f"Processing batch {batch_start//batch_size + 1}: pages {batch_start + 1}-{batch_end}")
+                # Limit concurrent threads to NUM_THREADS
+                max_workers = min(NUM_THREADS, len(batch_images))
+                self.logger.debug(f"Processing batch {batch_start//batch_size + 1}: pages {batch_start + 1}-{batch_end} with {max_workers} threads")
 
                 try:
-                    # Use CnOCR's image_list functionality for batch processing
-                    if hasattr(self.cnocr, 'ocr') and callable(self.cnocr.ocr):
-                        # Process batch of images
-                        batch_results = []
-                        for img in batch_images:
-                            try:
-                                ocr_result = self.cnocr.ocr(img)
-                                batch_results.append(ocr_result)
-                            except Exception as e:
-                                self.logger.warning(f"CnOCR recognition failed for image in batch: {e}")
-                                batch_results.append([])
-                    else:
-                        # Fallback to individual processing
-                        batch_results = []
-                        for img in batch_images:
-                            try:
-                                if hasattr(self.cnocr, 'ocr'):
-                                    ocr_result = self.cnocr.ocr(img)
-                                elif hasattr(self.cnocr, 'readtext'):
-                                    ocr_result = self.cnocr.readtext(img)
-                                else:
-                                    ocr_result = self.cnocr(img)
-                                batch_results.append(ocr_result)
-                            except Exception as e:
-                                self.logger.warning(f"CnOCR recognition failed for image in batch: {e}")
-                                batch_results.append([])
+                    # Use threading for parallel processing with limited workers
+                    batch_results = [None] * len(batch_images)
+
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        # Submit all pages in this batch
+                        future_to_idx = {
+                            executor.submit(process_single_page, (batch_start + i, img)): i
+                            for i, img in enumerate(batch_images)
+                        }
+
+                        # Collect results as they complete
+                        for future in as_completed(future_to_idx):
+                            batch_idx = future_to_idx[future]
+                            page_idx, ocr_result, error = future.result()
+                            batch_results[batch_idx] = ocr_result
+
+                            if error:
+                                self.logger.warning(f"Thread for page {page_idx + 1} encountered error: {error}")
 
                     # Process batch results
                     for batch_idx, ocr_result in enumerate(batch_results):

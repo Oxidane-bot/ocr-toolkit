@@ -200,7 +200,7 @@ def _analyze_tree_structure(tree_dict: dict) -> dict[str, int]:
     def _analyze_recursive(node, depth=0):
         stats["max_depth"] = max(stats["max_depth"], depth)
 
-        for _key, value in node.items():
+        for value in node.values():
             if value is None:  # File
                 stats["files"] += 1
             else:  # Directory
@@ -217,7 +217,7 @@ def _count_files_in_tree(tree_dict: dict) -> int:
         return 0
 
     count = 0
-    for _key, value in tree_dict.items():
+    for value in tree_dict.values():
         if value is None:  # File
             count += 1
         else:  # Directory
