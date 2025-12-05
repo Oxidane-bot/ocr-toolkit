@@ -7,6 +7,7 @@ import os
 import time
 from typing import Any
 
+from ..com_manager import get_com_manager
 from .base import ConversionStrategy
 
 
@@ -37,16 +38,12 @@ class WordComStrategy(ConversionStrategy):
         }
 
         start_time = time.time()
-        word = None
         doc = None
 
         try:
-            import win32com.client
-
-            # Create Word application
-            word = win32com.client.Dispatch("Word.Application")
-            word.Visible = False
-            word.DisplayAlerts = False
+            # Get shared Word application instance
+            com_manager = get_com_manager()
+            word = com_manager.get_word_app()
 
             # Open document
             doc = word.Documents.Open(os.path.abspath(input_path))
@@ -70,12 +67,11 @@ class WordComStrategy(ConversionStrategy):
             logging.error(f"Word COM conversion failed for {input_path}: {e}")
 
         finally:
-            # Clean up COM objects
+            # Only close the document, not the application
+            # The application will be reused for subsequent conversions
             try:
                 if doc:
                     doc.Close()
-                if word:
-                    word.Quit()
             except Exception:
                 pass
 

@@ -23,6 +23,7 @@ dependencies = [
     # Office document conversion support
     "docx2pdf>=0.1.8",
     "pywin32>=311; sys_platform == 'win32'",
+    "openpyxl>=3.1.5",
     # OCR support (for scanned documents)
     "torch>=2.7.0",
     "torchvision>=0.18.0",

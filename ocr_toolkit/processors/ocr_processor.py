@@ -8,6 +8,7 @@ The processor has been refactored following high-cohesion, low-coupling principl
 - CnOCR handling: cnocr_handler.py
 - Document loading: document_loader.py
 - Text file processing: text_file_processor.py
+- Excel data extraction: excel_processor.py
 """
 
 import logging
@@ -21,6 +22,7 @@ from ..utils import get_temp_manager
 from .base import FileProcessorBase, ProcessingResult
 from .cnocr_handler import CnOCRHandler
 from .document_loader import DocumentLoader
+from .excel_processor import ExcelDataProcessor
 from .text_file_processor import TextFileProcessor
 
 
@@ -41,12 +43,13 @@ class OCRProcessor(FileProcessorBase):
     Architecture:
     - Delegates document loading to DocumentLoader
     - Delegates text file processing to TextFileProcessor
+    - Delegates Excel data extraction to ExcelDataProcessor
     - Delegates CnOCR processing to CnOCRHandler
     - Handles DocTR OCR processing internally
     - Coordinates overall processing workflow
     """
 
-    def __init__(self, ocr_model, batch_size: int = 16, use_cnocr: bool = False):
+    def __init__(self, ocr_model, batch_size: int = 16, use_cnocr: bool = False, use_direct_excel: bool = True):
         """
         Initialize OCR processor.
 
@@ -54,6 +57,7 @@ class OCRProcessor(FileProcessorBase):
             ocr_model: Loaded DocTR OCR model
             batch_size: Number of pages to process in each batch
             use_cnocr: Whether to use CnOCR for Chinese text recognition (better for Chinese documents)
+            use_direct_excel: Whether to use direct Excel data extraction (faster, no Excel install needed)
         """
         super().__init__()
         self.ocr_model = ocr_model
@@ -64,6 +68,12 @@ class OCRProcessor(FileProcessorBase):
         # Initialize specialized handlers
         self.document_loader = DocumentLoader()
         self.text_processor = TextFileProcessor()
+
+        # Initialize Excel data processor if requested
+        self.excel_processor = None
+        self.use_direct_excel = use_direct_excel
+        if use_direct_excel:
+            self.excel_processor = ExcelDataProcessor()
 
         # Initialize CnOCR handler if requested
         self.cnocr_handler = None
@@ -129,6 +139,22 @@ class OCRProcessor(FileProcessorBase):
                 self.logger.debug(f"Processed text file {file_path} successfully")
                 result.processing_time = time.time() - start_time
                 return result
+
+            # Handle Excel files with direct data extraction (if enabled)
+            if self.excel_processor and self.excel_processor.supports_format(ext):
+                excel_result = self.excel_processor.process(file_path)
+                if excel_result.success:
+                    # Use Excel extraction result
+                    result.content = excel_result.content
+                    result.success = True
+                    result.pages = excel_result.pages
+                    self.logger.debug(f"Extracted data from {excel_result.pages} sheets in {file_path}")
+                    result.processing_time = time.time() - start_time
+                    return result
+                else:
+                    # Excel extraction failed, fall back to PDF conversion
+                    self.logger.warning(f"Excel data extraction failed for {file_path}: {excel_result.error}")
+                    self.logger.info(f"Falling back to PDF conversion for {file_path}")
 
             # Load document for OCR processing
             doc = self.document_loader.load_document(file_path, result)

@@ -7,6 +7,7 @@ import os
 import time
 from typing import Any
 
+from ..com_manager import get_com_manager
 from .base import ConversionStrategy
 
 
@@ -37,15 +38,12 @@ class PowerPointComStrategy(ConversionStrategy):
         }
 
         start_time = time.time()
-        powerpoint = None
         presentation = None
 
         try:
-            import win32com.client
-
-            # Create PowerPoint application
-            powerpoint = win32com.client.Dispatch("PowerPoint.Application")
-            powerpoint.Visible = 1  # PowerPoint needs to be visible for some operations
+            # Get shared PowerPoint application instance
+            com_manager = get_com_manager()
+            powerpoint = com_manager.get_powerpoint_app()
 
             # Open presentation
             presentation = powerpoint.Presentations.Open(
@@ -77,20 +75,14 @@ class PowerPointComStrategy(ConversionStrategy):
                 result['error'] += " (File access denied - check if file is open in another application)"
 
         finally:
-            # Clean up COM objects with better error handling
+            # Only close the presentation, not the application
+            # The application will be reused for subsequent conversions
             try:
                 if presentation:
                     presentation.Close()
                     logging.debug("Closed PowerPoint presentation")
             except Exception as e:
                 logging.debug(f"Error closing presentation: {e}")
-
-            try:
-                if powerpoint:
-                    powerpoint.Quit()
-                    logging.debug("Quit PowerPoint application")
-            except Exception as e:
-                logging.debug(f"Error quitting PowerPoint: {e}")
 
         result['processing_time'] = time.time() - start_time
         return result

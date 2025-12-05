@@ -152,3 +152,7 @@ models/
 # Local configuration
 local_config.py
 .env.local
+# Test files and planning documents
+test_files/
+.claude/plans/
+.claude/PLAN_*.md

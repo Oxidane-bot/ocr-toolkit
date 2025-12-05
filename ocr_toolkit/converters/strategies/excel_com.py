@@ -1,5 +1,9 @@
 """
 Excel workbook to PDF conversion strategy using COM automation.
+
+NOTE: This strategy is now a fallback option. Direct Excel data extraction
+via ExcelDataProcessor is preferred for better performance and no Excel dependency.
+This COM strategy is used only when direct extraction fails.
 """
 
 import logging
@@ -7,6 +11,7 @@ import os
 import time
 from typing import Any
 
+from ..com_manager import get_com_manager
 from .base import ConversionStrategy
 
 
@@ -37,16 +42,12 @@ class ExcelComStrategy(ConversionStrategy):
         }
 
         start_time = time.time()
-        excel = None
         workbook = None
 
         try:
-            import win32com.client
-
-            # Create Excel application
-            excel = win32com.client.Dispatch("Excel.Application")
-            excel.Visible = False
-            excel.DisplayAlerts = False
+            # Get shared Excel application instance
+            com_manager = get_com_manager()
+            excel = com_manager.get_excel_app()
 
             # Open workbook
             workbook = excel.Workbooks.Open(os.path.abspath(input_path))
@@ -69,12 +70,11 @@ class ExcelComStrategy(ConversionStrategy):
             logging.error(f"Excel COM conversion failed for {input_path}: {e}")
 
         finally:
-            # Clean up COM objects
+            # Only close the workbook, not the application
+            # The application will be reused for subsequent conversions
             try:
                 if workbook:
                     workbook.Close()
-                if excel:
-                    excel.Quit()
             except Exception:
                 pass
 
