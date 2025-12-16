@@ -42,11 +42,23 @@ def load_ocr_model(det_arch: str = None, reco_arch: str = None, use_cpu: bool = 
     use_gpu = not use_cpu and torch.cuda.is_available()
 
     if use_gpu:
-        logging.info("CUDA is available. Using GPU for doctr")
+        device_name = None
+        try:
+            device_name = torch.cuda.get_device_name(0)
+        except Exception:
+            device_name = None
+
+        suffix = f" (device: {device_name})" if device_name else ""
+        logging.info(f"CUDA is available. Using GPU for doctr{suffix}")
         model = ocr_predictor(det_arch=det_arch, reco_arch=reco_arch, pretrained=True).cuda()
     else:
         logging.info("Using CPU for doctr")
         model = ocr_predictor(det_arch=det_arch, reco_arch=reco_arch, pretrained=True)
+
+    try:
+        model.eval()
+    except Exception:
+        pass
 
     logging.info("Model loaded successfully")
     return model

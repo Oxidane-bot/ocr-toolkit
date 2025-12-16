@@ -2,15 +2,17 @@
 CLI for creating searchable PDF documents.
 """
 
+import contextlib
 import logging
 import os
 import shutil
-import subprocess
 import sys
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
-import ocrmypdf
+import pikepdf
 from doctr.io import DocumentFile
+from ocrmypdf.hocrtransform import HocrTransform, HocrTransformError
 from tqdm import tqdm
 
 from .. import config
@@ -24,26 +26,98 @@ from ..utils import (
 )
 
 
-def build_hocr(page_result, page_dims):
-    """Builds an hOCR string from a single page result."""
-    hocr_page = ET.Element("div", attrib={"class": "ocr_page"})
-    hocr_page.set("title", f"image; bbox 0 0 {page_dims[0]} {page_dims[1]}")
+def _clamp(value: int, min_value: int, max_value: int) -> int:
+    return max(min_value, min(value, max_value))
+
+
+def _bbox_from_geometry(geometry, page_dims: tuple[int, int]) -> tuple[int, int, int, int]:
+    page_width, page_height = page_dims
+    left = int(geometry[0][0] * page_width)
+    top = int(geometry[0][1] * page_height)
+    right = int(geometry[1][0] * page_width)
+    bottom = int(geometry[1][1] * page_height)
+
+    left = _clamp(left, 0, page_width)
+    right = _clamp(right, 0, page_width)
+    top = _clamp(top, 0, page_height)
+    bottom = _clamp(bottom, 0, page_height)
+
+    if right < left:
+        left, right = right, left
+    if bottom < top:
+        top, bottom = bottom, top
+
+    return left, top, right, bottom
+
+
+def build_hocr(page_result, page_dims: tuple[int, int], *, lang: str | None = None) -> str:
+    """Build an hOCR document compatible with ocrmypdf.hocrtransform."""
+    root = ET.Element("html")
+    body = ET.SubElement(root, "body")
+
+    page_width, page_height = page_dims
+    hocr_page = ET.SubElement(body, "div", attrib={"class": "ocr_page"})
+    hocr_page.set("title", f"image; bbox 0 0 {page_width} {page_height}")
 
     for block in page_result.blocks:
+        par_attrib = {"class": "ocr_par"}
+        if lang:
+            par_attrib["lang"] = lang
+        hocr_par = ET.SubElement(hocr_page, "p", attrib=par_attrib)
+
         for line in block.lines:
-            line_bbox = f"bbox {int(line.geometry[0][0] * page_dims[0])} {int(line.geometry[0][1] * page_dims[1])} {int(line.geometry[1][0] * page_dims[0])} {int(line.geometry[1][1] * page_dims[1])}"
+            left, top, right, bottom = _bbox_from_geometry(line.geometry, page_dims)
             hocr_line = ET.SubElement(
-                hocr_page, "span", attrib={"class": "ocr_line", "title": line_bbox}
+                hocr_par,
+                "span",
+                attrib={"class": "ocr_line", "title": f"bbox {left} {top} {right} {bottom}"},
             )
 
             for word in line.words:
-                word_bbox = f"bbox {int(word.geometry[0][0] * page_dims[0])} {int(word.geometry[0][1] * page_dims[1])} {int(word.geometry[1][0] * page_dims[0])} {int(word.geometry[1][1] * page_dims[1])}"
+                w_left, w_top, w_right, w_bottom = _bbox_from_geometry(word.geometry, page_dims)
                 hocr_word = ET.SubElement(
-                    hocr_line, "span", attrib={"class": "ocrx_word", "title": word_bbox}
+                    hocr_line,
+                    "span",
+                    attrib={
+                        "class": "ocrx_word",
+                        "title": f"bbox {w_left} {w_top} {w_right} {w_bottom}",
+                    },
                 )
                 hocr_word.text = word.value
 
-    return ET.tostring(hocr_page, encoding="unicode", method="xml")
+    return ET.tostring(root, encoding="unicode", method="xml")
+
+
+def _estimate_dpi(pdf_page: pikepdf.Page, page_dims: tuple[int, int]) -> float:
+    """Estimate the render DPI used by DocumentFile.from_pdf for this page."""
+    page_width_px, page_height_px = page_dims
+
+    try:
+        page_width_pt = float(pdf_page.MediaBox[2] - pdf_page.MediaBox[0])
+        page_height_pt = float(pdf_page.MediaBox[3] - pdf_page.MediaBox[1])
+    except Exception:
+        return 300.0
+
+    if page_width_pt <= 0 or page_height_pt <= 0:
+        return 300.0
+
+    dpi_x = (page_width_px * 72.0) / page_width_pt
+    dpi_y = (page_height_px * 72.0) / page_height_pt
+    return (dpi_x + dpi_y) / 2.0
+
+
+def _pikepdf_save_kwargs(optimize: int) -> dict:
+    if optimize <= 0:
+        return {"compress_streams": False, "object_stream_mode": pikepdf.ObjectStreamMode.preserve}
+    if optimize == 1:
+        return {"compress_streams": True, "object_stream_mode": pikepdf.ObjectStreamMode.preserve}
+    if optimize == 2:
+        return {"compress_streams": True, "object_stream_mode": pikepdf.ObjectStreamMode.generate}
+    return {
+        "compress_streams": True,
+        "object_stream_mode": pikepdf.ObjectStreamMode.generate,
+        "recompress_flate": True,
+    }
 
 
 def process_pdf(input_pdf, output_pdf, model, args):
@@ -51,7 +125,7 @@ def process_pdf(input_pdf, output_pdf, model, args):
     logging.info(f"Processing file: {input_pdf} -> {output_pdf}")
 
     # Create safe temp directory name by removing problematic characters
-    safe_name = os.path.basename(input_pdf).replace(' ', '_').replace('.pdf', '')
+    safe_name = os.path.basename(input_pdf).replace(" ", "_").replace(".pdf", "")
     temp_dir = f"temp_hocr_{safe_name}"
     os.makedirs(temp_dir, exist_ok=True)
 
@@ -61,75 +135,63 @@ def process_pdf(input_pdf, output_pdf, model, args):
         logging.error(f"Failed to load PDF {input_pdf}: {e}")
         return False
 
-    hocr_files = []
-    with tqdm(total=len(doc), desc="  - OCR Pages", unit="page") as pbar:
-        for i in range(0, len(doc), args.batch_size):
-            batch = doc[i : i + args.batch_size]
-            result = model(batch)
-
-            for page_idx, (page, page_result) in enumerate(zip(batch, result.pages, strict=False)):
-                page_dims = (page.shape[1], page.shape[0])
-                hocr_content = build_hocr(page_result, page_dims)
-                hocr_filename = os.path.join(temp_dir, f"page_{i+page_idx:04d}.hocr")
-                with open(hocr_filename, "w", encoding="utf-8") as f:
-                    f.write(hocr_content)
-                hocr_files.append(hocr_filename)
-                pbar.update(1)
-
-    logging.info("Combining hOCR files into a single sidecar file...")
-    sidecar_path = os.path.join(temp_dir, "sidecar.hocr")
-    with open(sidecar_path, "w", encoding="utf-8") as outfile:
-        outfile.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-        outfile.write(
-            '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">\n'
-        )
-        outfile.write(
-            '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">\n<head>\n</head>\n<body>\n'
-        )
-        for fname in sorted(hocr_files):
-            with open(fname, encoding="utf-8") as infile:
-                outfile.write(infile.read())
-        outfile.write("</body>\n</html>\n")
-
-    logging.info("Running ocrmypdf to create final searchable PDF...")
     try:
-        # Configure ocrmypdf parameters to avoid common issues
-        ocr_params = {
-            'input_file': input_pdf,
-            'output_file': output_pdf,
-            'sidecar': sidecar_path,
-            'optimize': args.optimize,
-            'redo_ocr': True,
-            'progress_bar': False,
-        }
+        if getattr(args, "no_jbig2", False):
+            logging.info("Note: --no-jbig2 is ignored (JBIG2 is not used in this pipeline).")
 
-        # Add JBIG2 avoidance for compatibility
-        if hasattr(args, 'no_jbig2') and args.no_jbig2:
-            ocr_params['jbig2_lossy'] = False
-            ocr_params['optimize'] = 0  # Disable optimization to avoid JBIG2
-            logging.info("JBIG2 optimization disabled for compatibility")
+        output_dir = os.path.dirname(output_pdf)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
 
-        ocrmypdf.ocr(**ocr_params)
+        try:
+            import torch
+            inference_ctx = (
+                torch.inference_mode() if hasattr(torch, "inference_mode") else torch.no_grad()
+            )
+        except Exception:
+            inference_ctx = contextlib.nullcontext()
+
+        lang = "chi_sim" if getattr(args, "zh", False) else None
+
+        with pikepdf.open(input_pdf) as pdf:
+            with tqdm(total=len(doc), desc="  - OCR Pages", unit="page") as pbar:
+                for batch_start in range(0, len(doc), args.batch_size):
+                    batch = doc[batch_start : batch_start + args.batch_size]
+                    with inference_ctx:
+                        result = model(batch)
+
+                    for offset, (page_img, page_result) in enumerate(
+                        zip(batch, result.pages, strict=False)
+                    ):
+                        page_index = batch_start + offset
+                        page_dims = (page_img.shape[1], page_img.shape[0])
+
+                        hocr_content = build_hocr(page_result, page_dims, lang=lang)
+                        hocr_path = Path(temp_dir) / f"page_{page_index:04d}.hocr"
+                        hocr_path.write_text(hocr_content, encoding="utf-8")
+
+                        text_pdf_path = Path(temp_dir) / f"page_{page_index:04d}.text.pdf"
+                        dpi = _estimate_dpi(pdf.pages[page_index], page_dims)
+                        try:
+                            HocrTransform(hocr_filename=hocr_path, dpi=dpi).to_pdf(
+                                out_filename=text_pdf_path,
+                                invisible_text=True,
+                            )
+                        except HocrTransformError as e:
+                            logging.error(f"Failed to convert hOCR to PDF text layer: {e}")
+                            return False
+
+                        with pikepdf.open(text_pdf_path) as overlay_pdf:
+                            pdf.pages[page_index].add_overlay(overlay_pdf.pages[0])
+
+                        pbar.update(1)
+
+            pdf.save(output_pdf, **_pikepdf_save_kwargs(args.optimize))
+
         logging.info(f"Successfully created searchable PDF: {output_pdf}")
         return True
-    except subprocess.CalledProcessError as e:
-        if 'jbig2' in str(e).lower():
-            logging.error("JBIG2 compression failed. Try running with --no-jbig2 or --optimize 0")
-            logging.error("This usually happens when JBIG2 tools are missing or incompatible")
-            logging.error(f"Command that failed: {e.cmd}")
-        else:
-            logging.error(f"ocrmypdf subprocess failed for {input_pdf}: {e}")
-        return False
-    except FileNotFoundError as e:
-        logging.error(f"Required tool not found: {e}")
-        logging.error("Please ensure all ocrmypdf dependencies are properly installed")
-        return False
     except Exception as e:
-        logging.error(f"ocrmypdf failed for {input_pdf}: {e}")
-        logging.error("You can try:")
-        logging.error("  1. Use --optimize 0 to disable optimization")
-        logging.error("  2. Use --no-jbig2 to avoid JBIG2 compression")
-        logging.error("  3. Check if all required tools are installed")
+        logging.error(f"Failed to create searchable PDF for {input_pdf}: {e}")
         return False
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -157,12 +219,12 @@ def create_parser():
         type=int,
         default=1,
         choices=[0, 1, 2, 3],
-        help="Set ocrmypdf optimization level (0-3). Default is 1 (levels 2-3 require pngquant)."
+        help="Set output compression/optimization level (0-3). Default is 1."
     )
     parser.add_argument(
         "--no-jbig2",
         action="store_true",
-        help="Disable JBIG2 compression to avoid compatibility issues with some systems."
+        help="Deprecated (no effect). Kept for backward compatibility."
     )
 
     # Add common OCR arguments
@@ -174,7 +236,6 @@ def create_parser():
 def main():
     """Main entry point for ocr-search command."""
     setup_logging()
-    logging.getLogger("ocrmypdf").setLevel(logging.ERROR)  # Suppress noisy ocrmypdf logs
 
     parser = create_parser()
     args = parser.parse_args()

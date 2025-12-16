@@ -12,11 +12,12 @@ import sys
 import time
 import warnings
 from argparse import Namespace
-
-import torch
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 from .. import config
-from .. import ocr_processor_wrapper
+from ..processors.excel_processor import ExcelDataProcessor
+from ..processors.text_file_processor import TextFileProcessor
 from ..utils import (
     BaseArgumentParser,
     add_common_ocr_args,
@@ -187,17 +188,35 @@ def main():
             cpu=args.cpu
         )
 
-        # Load OCR model
-        logging.info(f"Loading OCR model (det_arch={ocr_args.det_arch}, reco_arch={ocr_args.reco_arch})...")
-        logging.info(f"CPU flag: {ocr_args.cpu}, CUDA available: {torch.cuda.is_available()}")
-        ocr_model = load_ocr_model(ocr_args.det_arch, ocr_args.reco_arch, ocr_args.cpu)
+        # Lazily load OCR model only if any file requires it.
+        model_required_exts = {
+            '.pdf',
+            '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif',
+            '.doc', '.docx', '.ppt', '.pptx', '.xls'
+        }
+        needs_ocr_model = any(Path(p).suffix.lower() in model_required_exts for p in files_to_process)
 
-        # Create OCR processor wrapper (replaces legacy dual_processor)
-        processor = ocr_processor_wrapper.create_ocr_processor_wrapper(
-            ocr_model,
-            batch_size=ocr_args.batch_size,
-            use_zh=getattr(args, 'zh', False)
-        )
+        processor = None
+        if needs_ocr_model:
+            try:
+                import torch
+                cuda_available = torch.cuda.is_available()
+            except Exception:
+                cuda_available = False
+
+            logging.info(f"Loading OCR model (det_arch={ocr_args.det_arch}, reco_arch={ocr_args.reco_arch})...")
+            logging.info(f"CPU flag: {ocr_args.cpu}, CUDA available: {cuda_available}")
+            ocr_model = load_ocr_model(ocr_args.det_arch, ocr_args.reco_arch, ocr_args.cpu)
+
+            # Import lazily to avoid pulling in heavy OCR deps on non-OCR workloads.
+            from .. import ocr_processor_wrapper
+            processor = ocr_processor_wrapper.create_ocr_processor_wrapper(
+                ocr_model,
+                batch_size=ocr_args.batch_size,
+                use_zh=getattr(args, 'zh', False)
+            )
+        else:
+            logging.info("No OCR-required formats detected; skipping OCR model load.")
 
         # Get directory cache for optimized directory creation
         dir_cache = get_directory_cache()
@@ -228,28 +247,92 @@ def main():
         # Process documents with enhanced error handling
         results = []
         total_pages = 0
-        for processed_count, file_path in enumerate(files_to_process, start=1):
+        file_index = {file_path: idx for idx, file_path in enumerate(files_to_process, start=1)}
+
+        # Only parallelize formats that never touch GPU/COM conversion in our pipeline.
+        parallel_safe_exts = {'.txt', '.md', '.rtf', '.xlsx'}
+        parallel_file_set = {p for p in files_to_process if Path(p).suffix.lower() in parallel_safe_exts}
+        parallel_files = [p for p in files_to_process if p in parallel_file_set]
+        serial_files = [p for p in files_to_process if p not in parallel_file_set]
+
+        if args.workers > 1 and parallel_files:
+            logging.info(
+                f"Using {args.workers} workers for text/Excel files; other formats processed serially for GPU/Office safety."
+            )
+
+        def process_and_save(file_path: str) -> tuple[dict, int]:
+            processed_count = file_index.get(file_path, 0)
+            relative_path = file_relative_paths.get(file_path, os.path.basename(file_path))
+
             try:
                 # Enhanced logging for preserve structure mode
                 if args.preserve_structure:
-                    relative_path = file_relative_paths.get(file_path, os.path.basename(file_path))
-                    logging.info(f"Processing [{processed_count}/{len(files_to_process)}]: {file_path} -> {relative_path}")
+                    logging.info(
+                        f"Processing [{processed_count}/{len(files_to_process)}]: {file_path} -> {relative_path}"
+                    )
                 else:
                     logging.info(f"Processing [{processed_count}/{len(files_to_process)}]: {file_path}")
 
-                # Use wrapper's backward-compatible interface
-                result = processor.process_document(file_path, ocr_args)
-                results.append(result)
+                ext = Path(file_path).suffix.lower()
+
+                if processor is not None:
+                    # Use wrapper's backward-compatible interface
+                    result = processor.process_document(file_path, ocr_args)
+                else:
+                    # Light path: handle text / xlsx without loading OCR model.
+                    start_time = time.time()
+                    text_processor = TextFileProcessor()
+                    excel_processor = ExcelDataProcessor()
+
+                    if ext in {'.txt', '.md', '.rtf'}:
+                        content = text_processor.process_file(file_path)
+                        result = {
+                            'file_path': file_path,
+                            'file_name': os.path.basename(file_path),
+                            'success': True,
+                            'chosen_method': 'ocr',
+                            'final_content': content,
+                            'processing_time': time.time() - start_time,
+                            'pages': 1,
+                            'comparison': {},
+                            'ocr_result': {'success': True, 'content': content, 'error': ''},
+                            'temp_files': [],
+                            'error': ''
+                        }
+                    elif ext == '.xlsx':
+                        excel_result = excel_processor.process(file_path)
+                        result = {
+                            'file_path': file_path,
+                            'file_name': os.path.basename(file_path),
+                            'success': excel_result.success,
+                            'chosen_method': 'ocr',
+                            'final_content': excel_result.content if excel_result.success else '',
+                            'processing_time': excel_result.processing_time,
+                            'pages': excel_result.pages,
+                            'comparison': {},
+                            'ocr_result': {'success': excel_result.success, 'content': excel_result.content, 'error': excel_result.error},
+                            'temp_files': [],
+                            'error': excel_result.error if not excel_result.success else ''
+                        }
+                    else:
+                        result = {
+                            'file_path': file_path,
+                            'file_name': os.path.basename(file_path),
+                            'success': False,
+                            'chosen_method': 'none',
+                            'final_content': '',
+                            'processing_time': time.time() - start_time,
+                            'pages': 0,
+                            'comparison': {},
+                            'ocr_result': {'success': False, 'content': '', 'error': f'Unsupported file format: {ext}'},
+                            'temp_files': [],
+                            'error': f'Unsupported file format: {ext}'
+                        }
 
                 # Track page count for statistics
                 pages = result.get('pages', 0)
                 if pages == 0:
-                    # Estimate pages if not available (assume at least 1 page per successful file)
-                    pages = 1 if result['success'] else 0
-                total_pages += pages
-
-                # Get relative path for structure preservation
-                relative_path = file_relative_paths.get(file_path, os.path.basename(file_path))
+                    pages = 1 if result.get('success') else 0
 
                 # Save the result with error handling
                 try:
@@ -265,23 +348,24 @@ def main():
                     dir_cache.ensure_directory(os.path.dirname(output_file_path))
 
                     with open(output_file_path, 'w', encoding='utf-8') as f:
-                        f.write(result['final_content'])
+                        f.write(result.get('final_content', ''))
 
                     logging.debug(f"Saved output to: {output_file_path}")
 
                 except OSError as e:
                     logging.error(f"Failed to save output file for {file_path}: {e}")
-                    # Mark as failed if file saving failed
                     result['success'] = False
                     result['error'] = f"File save error: {e}"
 
-                status = "SUCCESS" if result['success'] else "FAILED"
-                method = result['chosen_method']
+                status = "SUCCESS" if result.get('success') else "FAILED"
+                method = result.get('chosen_method', 'none')
                 processing_time = result.get('processing_time', 0)
                 logging.info(f"  -> {status} (Method: {method}, Time: {processing_time:.2f}s, Pages: {pages})")
 
-                if not result['success'] and 'error' in result:
+                if not result.get('success') and result.get('error'):
                     logging.warning(f"  -> Error details: {result['error']}")
+
+                return result, pages
 
             except Exception as e:
                 # Handle unexpected errors during processing
@@ -290,7 +374,6 @@ def main():
                     import traceback
                     logging.debug(traceback.format_exc())
 
-                # Add failed result to maintain count accuracy
                 error_result = {
                     'success': False,
                     'error': f"Unexpected error: {e}",
@@ -299,7 +382,28 @@ def main():
                     'final_content': '',
                     'file_name': os.path.basename(file_path)
                 }
-                results.append(error_result)
+                return error_result, 0
+
+        futures = []
+        if args.workers > 1 and parallel_files:
+            with ThreadPoolExecutor(max_workers=args.workers) as executor:
+                futures = [executor.submit(process_and_save, file_path) for file_path in parallel_files]
+
+                # Process OCR/Office-heavy formats serially in main thread while workers handle safe formats.
+                for file_path in serial_files:
+                    result, pages = process_and_save(file_path)
+                    results.append(result)
+                    total_pages += pages
+
+                for future in as_completed(futures):
+                    result, pages = future.result()
+                    results.append(result)
+                    total_pages += pages
+        else:
+            for file_path in files_to_process:
+                result, pages = process_and_save(file_path)
+                results.append(result)
+                total_pages += pages
 
         # Display results summary
         print("\n" + "="*60)
@@ -312,14 +416,33 @@ def main():
         success_rate = (successful / total_files * 100) if total_files > 0 else 0
 
         # Calculate detailed timing statistics
-        total_processing_time = sum(r.get('processing_time', 0) for r in results)
-        average_time_per_file = total_processing_time / total_files if total_files > 0 else 0
-        average_time_per_page = total_processing_time / total_pages if total_pages > 0 else 0
+        sum_processing_time = sum(r.get('processing_time', 0) for r in results)
+        average_time_per_file = sum_processing_time / total_files if total_files > 0 else 0
+        average_time_per_page = sum_processing_time / total_pages if total_pages > 0 else 0
 
         # Calculate overall conversion time
         conversion_end_time = time.time()
         total_conversion_time = conversion_end_time - conversion_start_time
-        overhead_time = total_conversion_time - total_processing_time
+
+        # In parallel mode, per-file processing times overlap; use a critical-path estimate.
+        used_parallel = args.workers > 1 and bool(parallel_files)
+        if used_parallel:
+            serial_processing_time = sum(
+                r.get('processing_time', 0)
+                for r in results
+                if Path(r.get('file_path', '')).suffix.lower() not in parallel_safe_exts
+            )
+            parallel_processing_times = [
+                r.get('processing_time', 0)
+                for r in results
+                if Path(r.get('file_path', '')).suffix.lower() in parallel_safe_exts
+            ]
+            parallel_max_processing_time = max(parallel_processing_times, default=0)
+            effective_processing_time = max(serial_processing_time, parallel_max_processing_time)
+        else:
+            effective_processing_time = sum_processing_time
+
+        overhead_time = max(0.0, total_conversion_time - effective_processing_time)
 
         print(f"Total files processed: {total_files}")
         print(f"Total pages processed: {total_pages}")
@@ -329,15 +452,22 @@ def main():
         print("")
         print("PERFORMANCE METRICS:")
         print(f"Total conversion time: {total_conversion_time:.2f}s")
-        print(f"Pure processing time: {total_processing_time:.2f}s")
+        if used_parallel:
+            print(f"Critical path processing time: {effective_processing_time:.2f}s")
+            print(f"Sum of per-file processing time: {sum_processing_time:.2f}s")
+        else:
+            print(f"Pure processing time: {sum_processing_time:.2f}s")
         print(f"Overhead time (I/O, setup): {overhead_time:.2f}s ({overhead_time/total_conversion_time*100:.1f}%)")
         print(f"Average time per file: {average_time_per_file:.2f}s")
         if total_pages > 0:
             print(f"Average time per page: {average_time_per_page:.2f}s")
-            print(f"Processing throughput: {total_pages/total_processing_time:.1f} pages/sec")
+            print(f"Processing throughput (wall): {total_pages/total_conversion_time:.1f} pages/sec")
 
         # Basic processing statistics (OCR-focused)
-        stats = processor.get_detailed_statistics() if hasattr(processor, 'get_detailed_statistics') else processor.get_statistics()
+        if processor is not None:
+            stats = processor.get_detailed_statistics() if hasattr(processor, 'get_detailed_statistics') else processor.get_statistics()
+        else:
+            stats = {'success_rate': success_rate}
         print("\nProcessing Stats:")
         if 'success_rate' in stats:
             print(f"  Success rate: {stats['success_rate']:.1f}%")

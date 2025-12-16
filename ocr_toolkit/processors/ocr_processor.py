@@ -221,7 +221,17 @@ class OCRProcessor(FileProcessorBase):
         # Process in batches
         for i in range(0, len(doc), self.batch_size):
             batch = doc[i : i + self.batch_size]
-            ocr_result = self.ocr_model(batch)
+            try:
+                import torch
+                inference_ctx = (
+                    torch.inference_mode() if hasattr(torch, "inference_mode") else torch.no_grad()
+                )
+            except Exception:
+                from contextlib import nullcontext
+                inference_ctx = nullcontext()
+
+            with inference_ctx:
+                ocr_result = self.ocr_model(batch)
 
             for page_idx, page_result in enumerate(ocr_result.pages):
                 current_page_number = i + page_idx + 1
