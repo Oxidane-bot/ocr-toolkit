@@ -162,15 +162,16 @@ class TestExcelDataProcessorIntegration:
     def test_process_real_excel_file(self):
         """Test processing a real Excel file if samples exist."""
         # Try to find sample Excel files
+        project_root = Path(__file__).parent.parent.parent
         sample_files = [
-            'test_files/excel_samples/Trial Balance Solutions.xlsx',
-            'test_files/excel_samples/Income Statement Solutions.xlsx'
+            project_root / 'testFile/excel_samples/Trial Balance Solutions.xlsx',
+            project_root / 'testFile/excel_samples/Income Statement Solutions.xlsx'
         ]
 
         excel_file = None
         for sample in sample_files:
-            if os.path.exists(sample):
-                excel_file = sample
+            if sample.exists():
+                excel_file = str(sample)
                 break
 
         if not excel_file:
@@ -193,10 +194,13 @@ class TestExcelDataProcessorIntegration:
 
     def test_process_real_file_sheet_count(self):
         """Test that sheet count is correctly reported."""
-        sample_file = 'test_files/excel_samples/Trial Balance Solutions.xlsx'
+        project_root = Path(__file__).parent.parent.parent
+        sample_file = project_root / 'testFile/excel_samples/Trial Balance Solutions.xlsx'
 
-        if not os.path.exists(sample_file):
+        if not sample_file.exists():
             pytest.skip("Sample Excel file not found")
+
+        sample_file = str(sample_file)
 
         result = self.processor.process(sample_file)
 
@@ -206,10 +210,13 @@ class TestExcelDataProcessorIntegration:
 
     def test_process_real_file_content_structure(self):
         """Test that processed content has proper Markdown structure."""
-        sample_file = 'test_files/excel_samples/Trial Balance Solutions.xlsx'
+        project_root = Path(__file__).parent.parent.parent
+        sample_file = project_root / 'testFile/excel_samples/Trial Balance Solutions.xlsx'
 
-        if not os.path.exists(sample_file):
+        if not sample_file.exists():
             pytest.skip("Sample Excel file not found")
+
+        sample_file = str(sample_file)
 
         result = self.processor.process(sample_file)
 

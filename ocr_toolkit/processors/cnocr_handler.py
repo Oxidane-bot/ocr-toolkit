@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from doctr.io import DocumentFile
 
+from ..utils.profiling import Profiler
 
 class CnOCRHandler:
     """
@@ -139,7 +140,15 @@ class CnOCRHandler:
         """
         return self.initialized and self.cnocr is not None
 
-    def process_document(self, doc: DocumentFile, file_path: str, ext: str) -> str:
+    def process_document(
+        self,
+        doc: DocumentFile,
+        file_path: str,
+        ext: str,
+        *,
+        page_numbers: list[int] | None = None,
+        profiler: Profiler | None = None,
+    ) -> str:
         """
         Process document with CnOCR using multi-threaded batch processing.
 
@@ -158,10 +167,17 @@ class CnOCRHandler:
 
         try:
             # Convert all pages to images for batch processing
-            page_images = [
-                page.numpy() if hasattr(page, 'numpy') else page
-                for page in doc
-            ]
+            if profiler:
+                with profiler.track("cnocr_prepare_images", count=len(doc)):
+                    page_images = [
+                        page.numpy() if hasattr(page, 'numpy') else page
+                        for page in doc
+                    ]
+            else:
+                page_images = [
+                    page.numpy() if hasattr(page, 'numpy') else page
+                    for page in doc
+                ]
 
             # Process in batches using multi-threading
             batch_size = min(self.batch_size, len(page_images))
@@ -171,18 +187,29 @@ class CnOCRHandler:
                 batch_images = page_images[batch_start:batch_end]
 
                 # Process this batch with threading
-                batch_results = self._process_batch(batch_images, batch_start)
+                if profiler:
+                    with profiler.track("cnocr_batch", count=len(batch_images)):
+                        batch_results = self._process_batch(batch_images, batch_start)
+                else:
+                    batch_results = self._process_batch(batch_images, batch_start)
 
                 # Format results as markdown
                 for batch_idx, ocr_result in enumerate(batch_results):
                     page_idx = batch_start + batch_idx
+                    display_page_number = (
+                        page_numbers[page_idx]
+                        if page_numbers and page_idx < len(page_numbers)
+                        else page_idx + 1
+                    )
                     page_text = self._extract_text_from_result(ocr_result)
 
                     # Format content based on file type
-                    formatted_text = self._format_page_content(page_text, page_idx, file_path, ext)
+                    formatted_text = self._format_page_content(page_text, display_page_number, file_path, ext)
                     markdown_content.append(formatted_text)
 
-                    self.logger.debug(f"CnOCR processed page {page_idx + 1} with {len(ocr_result) if ocr_result else 0} text blocks")
+                    self.logger.debug(
+                        f"CnOCR processed page {display_page_number} with {len(ocr_result) if ocr_result else 0} text blocks"
+                    )
 
         except Exception as e:
             self.logger.error(f"CnOCR processing failed: {e}")
@@ -286,7 +313,7 @@ class CnOCRHandler:
 
         return '\n'.join([line.strip() for line in text_lines if line.strip()])
 
-    def _format_page_content(self, page_text: str, page_idx: int, file_path: str, ext: str) -> str:
+    def _format_page_content(self, page_text: str, page_number: int, file_path: str, ext: str) -> str:
         """
         Format page content as markdown based on file type.
 
@@ -304,4 +331,4 @@ class CnOCRHandler:
             return f"# {os.path.basename(file_path)}\n\n{page_text}"
 
         # For multi-page documents, use page numbers
-        return f"## Page {page_idx + 1}\n\n{page_text}"
+        return f"## Page {page_number}\n\n{page_text}"

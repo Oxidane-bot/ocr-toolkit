@@ -4,6 +4,7 @@ CLI for OCR performance benchmarking.
 
 import argparse
 import logging
+import os
 import sys
 
 from ..utils import add_common_ocr_args, configure_logging_level, discover_pdf_files
@@ -67,6 +68,24 @@ def main():
     configure_logging_level(args)
 
     try:
+        if getattr(args, "zh", False):
+            if args.threads is None:
+                args.threads = 8
+                logging.debug("Defaulting threads to 8 for --zh mode")
+
+            try:
+                from .. import config
+
+                if args.batch_size == config.DEFAULT_BATCH_SIZE:
+                    args.batch_size = 32
+                    logging.debug("Defaulting batch_size to 32 for --zh mode")
+            except Exception:
+                pass
+
+        if getattr(args, "threads", None):
+            os.environ["OMP_NUM_THREADS"] = str(args.threads)
+            os.environ["MKL_NUM_THREADS"] = str(args.threads)
+
         # Import benchmark module
         from .. import benchmark
 
@@ -97,7 +116,12 @@ def main():
             batch_size=args.batch_size,
             workers=args.workers,
             use_cpu=args.cpu,
-            timeout=args.timeout
+            timeout=args.timeout,
+            zh=getattr(args, "zh", False),
+            fast=getattr(args, "fast", False),
+            pages=getattr(args, "pages", None),
+            profile=getattr(args, "profile", False),
+            threads=getattr(args, "threads", None),
         )
 
         # Print results summary

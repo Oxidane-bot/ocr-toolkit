@@ -2,7 +2,10 @@
 CLI for creating searchable PDF documents.
 """
 
+from __future__ import annotations
+
 import contextlib
+import importlib
 import logging
 import os
 import shutil
@@ -10,9 +13,7 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-import pikepdf
 from doctr.io import DocumentFile
-from ocrmypdf.hocrtransform import HocrTransform, HocrTransformError
 from tqdm import tqdm
 
 from .. import config
@@ -24,6 +25,38 @@ from ..utils import (
     load_ocr_model,
     setup_logging,
 )
+
+
+def _require_search_dependencies():
+    try:
+        pikepdf = importlib.import_module("pikepdf")
+        hocrtransform = importlib.import_module("ocrmypdf.hocrtransform")
+    except ModuleNotFoundError as exc:
+        missing = exc.name or "ocrmypdf"
+        print(
+            f"Missing optional dependency '{missing}' required for `ocr-search`.\n"
+            "Install searchable PDF support with one of:\n"
+            "  uv pip install \".[search]\"\n"
+            "  uv tool install \".[search]\"\n"
+            "  pip install \"ocr-cli[search]\"\n",
+            file=sys.stderr,
+        )
+        raise SystemExit(1) from exc
+
+    try:
+        HocrTransform = hocrtransform.HocrTransform
+        HocrTransformError = hocrtransform.HocrTransformError
+    except AttributeError as exc:
+        print(
+            "Installed `ocrmypdf` does not provide `ocrmypdf.hocrtransform`.\n"
+            "Reinstall searchable PDF support with one of:\n"
+            "  uv pip install --upgrade \".[search]\"\n"
+            "  pip install --upgrade \"ocr-cli[search]\"\n",
+            file=sys.stderr,
+        )
+        raise SystemExit(1) from exc
+
+    return pikepdf, HocrTransform, HocrTransformError
 
 
 def _clamp(value: int, min_value: int, max_value: int) -> int:
@@ -88,7 +121,7 @@ def build_hocr(page_result, page_dims: tuple[int, int], *, lang: str | None = No
     return ET.tostring(root, encoding="unicode", method="xml")
 
 
-def _estimate_dpi(pdf_page: pikepdf.Page, page_dims: tuple[int, int]) -> float:
+def _estimate_dpi(pdf_page, page_dims: tuple[int, int]) -> float:
     """Estimate the render DPI used by DocumentFile.from_pdf for this page."""
     page_width_px, page_height_px = page_dims
 
@@ -106,7 +139,7 @@ def _estimate_dpi(pdf_page: pikepdf.Page, page_dims: tuple[int, int]) -> float:
     return (dpi_x + dpi_y) / 2.0
 
 
-def _pikepdf_save_kwargs(optimize: int) -> dict:
+def _pikepdf_save_kwargs(optimize: int, pikepdf) -> dict:
     if optimize <= 0:
         return {"compress_streams": False, "object_stream_mode": pikepdf.ObjectStreamMode.preserve}
     if optimize == 1:
@@ -120,7 +153,7 @@ def _pikepdf_save_kwargs(optimize: int) -> dict:
     }
 
 
-def process_pdf(input_pdf, output_pdf, model, args):
+def process_pdf(input_pdf, output_pdf, model, args, *, pikepdf, HocrTransform, HocrTransformError):
     """Processes a single PDF file to make it searchable."""
     logging.info(f"Processing file: {input_pdf} -> {output_pdf}")
 
@@ -186,7 +219,7 @@ def process_pdf(input_pdf, output_pdf, model, args):
 
                         pbar.update(1)
 
-            pdf.save(output_pdf, **_pikepdf_save_kwargs(args.optimize))
+            pdf.save(output_pdf, **_pikepdf_save_kwargs(args.optimize, pikepdf))
 
         logging.info(f"Successfully created searchable PDF: {output_pdf}")
         return True
@@ -244,6 +277,8 @@ def main():
     configure_logging_level(args)
 
     try:
+        pikepdf, HocrTransform, HocrTransformError = _require_search_dependencies()
+
         # Load OCR model
         model = load_ocr_model(args.det_arch, args.reco_arch, args.cpu)
 
@@ -264,7 +299,15 @@ def main():
             for i, pdf_file in enumerate(pdf_files):
                 logging.info(f"--- Starting file {i+1}/{len(pdf_files)} ---")
                 output_file = os.path.join(output_dir, os.path.basename(pdf_file))
-                if process_pdf(pdf_file, output_file, model, args):
+                if process_pdf(
+                    pdf_file,
+                    output_file,
+                    model,
+                    args,
+                    pikepdf=pikepdf,
+                    HocrTransform=HocrTransform,
+                    HocrTransformError=HocrTransformError,
+                ):
                     success_count += 1
 
             logging.info(f"Directory processing completed! {success_count}/{len(pdf_files)} files processed successfully.")
@@ -278,7 +321,15 @@ def main():
             if os.path.isdir(output_file):
                 output_file = os.path.join(output_file, os.path.basename(args.input_path))
 
-            if process_pdf(args.input_path, output_file, model, args):
+            if process_pdf(
+                args.input_path,
+                output_file,
+                model,
+                args,
+                pikepdf=pikepdf,
+                HocrTransform=HocrTransform,
+                HocrTransformError=HocrTransformError,
+            ):
                 logging.info("Single file processing completed successfully!")
             else:
                 logging.error("Failed to process the file.")

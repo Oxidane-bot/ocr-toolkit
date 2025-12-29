@@ -56,8 +56,14 @@ Convert documents to Markdown instantly with MarkItDown technology and OCR fallb
 # Install with uv (recommended)
 uv pip install .
 
+# Optional: enable searchable PDF creation (ocr-search)
+uv pip install ".[search]"
+
 # Or with pip
 pip install .
+
+# Optional: enable searchable PDF creation (ocr-search)
+pip install ".[search]"
 ```
 
 ### Global Tool Installation
@@ -103,7 +109,7 @@ uv run ocr-convert --list-formats
 # Extract text from scanned PDFs
 uv run ocr-extract scanned_document.pdf
 
-# Create searchable PDFs
+# Create searchable PDFs (requires: uv pip install ".[search]")
 uv run ocr-search input.pdf searchable_output.pdf
 ```
 
@@ -183,6 +189,7 @@ Options:
 ### `ocr-search` - Searchable PDF Creation
 
 Convert scanned PDFs to searchable format.
+Requires installing optional searchable-PDF dependencies: `uv pip install ".[search]"`.
 
 ```bash
 uv run ocr-search [OPTIONS] INPUT_PDF [OUTPUT_PDF]
@@ -265,16 +272,13 @@ uv tool install --extra-index-url https://download.pytorch.org/whl/cu128 --index
 ocr-search --help  # Check if tools are available
 ```
 
-**JBIG2 compression errors**:
+**`ocr-search` dependency not installed**:
 ```bash
-# Use --no-jbig2 to avoid JBIG2 dependency issues
-ocr-search --no-jbig2 document.pdf
+# Install searchable PDF support
+uv pip install ".[search]"
 
-# Or disable optimization completely
-ocr-search --optimize 0 document.pdf
-
-# For batch processing
-ocr-search --no-jbig2 documents/
+# Or
+pip install "ocr-cli[search]"
 ```
 
 ## 📈 When to Use Each Tool

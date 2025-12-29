@@ -143,7 +143,7 @@ def main():
         method_stats = {'markitdown': 0, 'ocr': 0, 'failed': 0}
 
         logging.info(f"Processing {total_files} files using {processing_mode}...")
-        print(f"\n🔄 Processing Mode: {processing_mode}")
+        print(f"\nProcessing Mode: {processing_mode}")
 
         for i, file_path in enumerate(files, 1):
             try:
@@ -153,14 +153,9 @@ def main():
                 if args.markitdown_only or args.ocr_only:
                     result = processor.process(file_path, fast=args.fast, pages=args.pages, profile=args.profile)
                     # Convert ProcessingResult to dict for compatibility
-                    result_dict = {
-                        'success': result.success,
-                        'content': result.content,
-                        'final_content': result.content,  # For compatibility
-                        'chosen_method': result.method,
-                        'processing_time': result.processing_time,
-                        'error': result.error
-                    }
+                    result_dict = result.to_dict()
+                    result_dict["final_content"] = result.content  # Backward compatibility
+                    result_dict["chosen_method"] = result.method
                 else:
                     # Dual processing - use legacy interface
                     result_dict = processor.process_document(file_path, args)
@@ -173,6 +168,23 @@ def main():
                     # Estimate pages if not available (assume at least 1 page per successful file)
                     pages = 1 if result_dict.get('success', False) else 0
                 total_pages += pages
+
+                if args.profile:
+                    profile = None
+                    if isinstance(result_dict.get("metadata"), dict):
+                        profile = result_dict["metadata"].get("profile")
+                    if profile is None and isinstance(result_dict.get("ocr_result"), dict):
+                        profile = result_dict["ocr_result"].get("metadata", {}).get("profile")
+                    if isinstance(profile, dict) and profile:
+                        print("   Profile:")
+                        for name, data in sorted(
+                            profile.items(),
+                            key=lambda kv: float(kv[1].get("total_s", 0.0)),
+                            reverse=True,
+                        ):
+                            total_s = float(data.get("total_s", 0.0))
+                            count = int(data.get("count", 0))
+                            print(f"     - {name}: {total_s:.3f}s (n={count})")
 
                 if result_dict.get('success', False):
                     # Get relative path for structure preservation
@@ -204,64 +216,64 @@ def main():
                     # Show selection details if requested
                     if args.show_selection and 'comparison' in result_dict:
                         comparison = result_dict['comparison']
-                        print(f"   📊 {comparison['selection_reason']}")
+                        print(f"   {comparison['selection_reason']}")
                         if 'quality_details' in comparison:
                             md_score = comparison.get('markitdown_score', 0)
                             ocr_score = comparison.get('ocr_score', 0)
-                            print(f"   📈 Quality scores: MarkItDown={md_score:.1f}, OCR={ocr_score:.1f}")
+                            print(f"   Quality scores: MarkItDown={md_score:.1f}, OCR={ocr_score:.1f}")
 
-                    logging.info(f"✅ Successfully processed {os.path.basename(file_path)} → {chosen_method.upper()}")
+                    logging.info(f"Successfully processed {os.path.basename(file_path)} -> {chosen_method.upper()}")
                 else:
                     method_stats['failed'] += 1
                     error = result_dict.get('error', 'Unknown error')
-                    logging.error(f"❌ Failed to process {os.path.basename(file_path)}: {error}")
+                    logging.error(f"Failed to process {os.path.basename(file_path)}: {error}")
 
             except Exception as e:
                 method_stats['failed'] += 1
-                logging.error(f"❌ Failed to process {file_path}: {e}")
+                logging.error(f"Failed to process {file_path}: {e}")
                 continue
 
         # Print comprehensive summary
         print("\n" + "="*80)
-        print("📊 INTELLIGENT EXTRACTION SUMMARY")
+        print("INTELLIGENT EXTRACTION SUMMARY")
         print("="*80)
-        print(f"📁 Total files processed: {total_files}")
-        print(f"📄 Total pages processed: {total_pages}")
-        print(f"✅ Successful extractions: {successful_files}")
-        print(f"❌ Failed extractions: {method_stats['failed']}")
-        print(f"🎯 Success rate: {(successful_files/total_files*100):.1f}%")
+        print(f"Total files processed: {total_files}")
+        print(f"Total pages processed: {total_pages}")
+        print(f"Successful extractions: {successful_files}")
+        print(f"Failed extractions: {method_stats['failed']}")
+        print(f"Success rate: {(successful_files/total_files*100):.1f}%")
         print("")
-        print(f"⏱️  Total processing time: {total_processing_time:.2f}s")
-        print(f"📊 Average time per file: {total_processing_time/total_files:.2f}s")
+        print(f"Total processing time: {total_processing_time:.2f}s")
+        print(f"Average time per file: {total_processing_time/total_files:.2f}s")
         if total_pages > 0:
-            print(f"📊 Average time per page: {total_processing_time/total_pages:.2f}s")
+            print(f"Average time per page: {total_processing_time/total_pages:.2f}s")
 
         if not args.markitdown_only and not args.ocr_only:
             # Show method distribution for dual processing
-            print("\n🧠 Method Selection Distribution:")
+            print("\nMethod Selection Distribution:")
             if method_stats['markitdown'] > 0:
-                print(f"   📝 MarkItDown chosen: {method_stats['markitdown']} files ({method_stats['markitdown']/successful_files*100:.1f}%)")
+                print(f"   MarkItDown chosen: {method_stats['markitdown']} files ({method_stats['markitdown']/successful_files*100:.1f}%)")
             if method_stats['ocr'] > 0:
-                print(f"   🔍 OCR chosen: {method_stats['ocr']} files ({method_stats['ocr']/successful_files*100:.1f}%)")
+                print(f"   OCR chosen: {method_stats['ocr']} files ({method_stats['ocr']/successful_files*100:.1f}%)")
 
             # Show dual processor statistics
             if hasattr(processor, 'get_statistics'):
                 dual_stats = processor.get_statistics()
-                print("\n📈 Processing Statistics:")
-                print(f"   🎯 Overall success rate: {dual_stats.get('success_rate', 0):.1f}%")
+                print("\nProcessing Statistics:")
+                print(f"   Overall success rate: {dual_stats.get('success_rate', 0):.1f}%")
                 if dual_stats.get('markitdown_only', 0) > 0:
-                    print(f"   📝 MarkItDown-only successes: {dual_stats['markitdown_only']}")
+                    print(f"   MarkItDown-only successes: {dual_stats['markitdown_only']}")
                 if dual_stats.get('ocr_only', 0) > 0:
-                    print(f"   🔍 OCR-only successes: {dual_stats['ocr_only']}")
+                    print(f"   OCR-only successes: {dual_stats['ocr_only']}")
 
         structure_note = " (preserving directory structure)" if getattr(args, 'preserve_structure', False) else " (flat structure)"
-        print(f"\n📂 Output directory: {output_dir}{structure_note}")
+        print(f"\nOutput directory: {output_dir}{structure_note}")
 
         if successful_files == total_files:
-            print("\n🎉 All files processed successfully!")
+            print("\nAll files processed successfully!")
             logging.info("All files processed successfully!")
         else:
-            print(f"\n⚠️  {total_files - successful_files} files failed to process.")
+            print(f"\nWARNING: {total_files - successful_files} files failed to process.")
             logging.warning(f"{total_files - successful_files} files failed to process.")
             sys.exit(1)
 

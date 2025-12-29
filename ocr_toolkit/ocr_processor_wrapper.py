@@ -64,7 +64,8 @@ class OCRProcessorWrapper:
             result = self.processor.process(
                 file_path,
                 fast=getattr(args, 'fast', False) if args else False,
-                pages=getattr(args, 'pages', None) if args else None
+                pages=getattr(args, 'pages', None) if args else None,
+                profile=getattr(args, 'profile', False) if args else False,
             )
 
             # Convert to legacy format for compatibility

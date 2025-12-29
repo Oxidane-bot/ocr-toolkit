@@ -19,6 +19,7 @@ from pathlib import Path
 from doctr.io import DocumentFile
 
 from ..utils import get_temp_manager
+from ..utils.profiling import Profiler
 from .base import FileProcessorBase, ProcessingResult
 from .cnocr_handler import CnOCRHandler
 from .document_loader import DocumentLoader
@@ -117,6 +118,11 @@ class OCRProcessor(FileProcessorBase):
         start_time = time.time()
         result = self._create_result(file_path, 'ocr', start_time)
 
+        fast = bool(kwargs.get("fast", False))
+        pages = kwargs.get("pages", None)
+        profile_enabled = bool(kwargs.get("profile", False))
+        profiler = Profiler() if profile_enabled else None
+
         if not self._validate_file(file_path):
             result.error = f'Invalid file: {file_path}'
             result.processing_time = time.time() - start_time
@@ -157,16 +163,35 @@ class OCRProcessor(FileProcessorBase):
                     self.logger.info(f"Falling back to PDF conversion for {file_path}")
 
             # Load document for OCR processing
-            doc = self.document_loader.load_document(file_path, result)
+            doc = self.document_loader.load_document(
+                file_path,
+                result,
+                pages=pages,
+                fast=fast,
+                profiler=profiler,
+            )
             if doc is None:
                 result.processing_time = time.time() - start_time
                 return result
 
             # Process with OCR (choose between CnOCR and DocTR)
+            page_numbers = result.metadata.get("page_numbers")
             if self._should_use_cnocr(ext):
-                content = self.cnocr_handler.process_document(doc, file_path, ext)
+                content = self.cnocr_handler.process_document(
+                    doc,
+                    file_path,
+                    ext,
+                    page_numbers=page_numbers,
+                    profiler=profiler,
+                )
             else:
-                content = self._process_with_doctr(doc, file_path, ext)
+                content = self._process_with_doctr(
+                    doc,
+                    file_path,
+                    ext,
+                    page_numbers=page_numbers,
+                    profiler=profiler,
+                )
 
             result.content = content
             result.success = True
@@ -181,6 +206,9 @@ class OCRProcessor(FileProcessorBase):
             # Clean up temporary files
             if result.temp_files:
                 cleanup_temp_files(result.temp_files)
+
+        if profiler:
+            result.metadata["profile"] = profiler.to_dict()
 
         result.processing_time = time.time() - start_time
         return result
@@ -204,7 +232,15 @@ class OCRProcessor(FileProcessorBase):
         cnocr_supported = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif', '.pdf'}
         return ext in cnocr_supported
 
-    def _process_with_doctr(self, doc: DocumentFile, file_path: str, ext: str) -> str:
+    def _process_with_doctr(
+        self,
+        doc: DocumentFile,
+        file_path: str,
+        ext: str,
+        *,
+        page_numbers: list[int] | None = None,
+        profiler: Profiler | None = None,
+    ) -> str:
         """
         Process loaded document with DocTR OCR model.
 
@@ -230,12 +266,25 @@ class OCRProcessor(FileProcessorBase):
                 from contextlib import nullcontext
                 inference_ctx = nullcontext()
 
-            with inference_ctx:
-                ocr_result = self.ocr_model(batch)
+            if profiler:
+                with profiler.track("doctr_inference", count=len(batch)):
+                    with inference_ctx:
+                        ocr_result = self.ocr_model(batch)
+            else:
+                with inference_ctx:
+                    ocr_result = self.ocr_model(batch)
 
             for page_idx, page_result in enumerate(ocr_result.pages):
-                current_page_number = i + page_idx + 1
-                text = page_result.render()
+                current_page_number = (
+                    page_numbers[i + page_idx]
+                    if page_numbers and (i + page_idx) < len(page_numbers)
+                    else i + page_idx + 1
+                )
+                if profiler:
+                    with profiler.track("doctr_render_text"):
+                        text = page_result.render()
+                else:
+                    text = page_result.render()
 
                 # Format content based on file type
                 formatted_text = self._format_page_content(text, current_page_number, file_path, ext)

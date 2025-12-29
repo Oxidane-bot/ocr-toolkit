@@ -55,8 +55,14 @@
 # 使用 uv 安装 (推荐)
 uv pip install .
 
+# Optional: enable searchable PDF creation (ocr-search)
+uv pip install ".[search]"
+
 # 或使用 pip
 pip install .
+
+# Optional: enable searchable PDF creation (ocr-search)
+pip install ".[search]"
 ```
 
 ### 全局工具安装
@@ -104,6 +110,7 @@ uv run ocr-extract scanned_document.pdf
 
 # 创建可搜索PDF
 uv run ocr-search input.pdf searchable_output.pdf
+# (Requires: uv pip install ".[search]" or pip install "ocr-cli[search]")
 ```
 
 ### 性能测试

@@ -127,9 +127,13 @@ class ComApplicationManager:
         try:
             import win32com.client
             self._powerpoint_app = win32com.client.Dispatch("PowerPoint.Application")
-            # PowerPoint needs to be visible for SaveAs to work properly
-            # but we minimize window interference
-            self._powerpoint_app.Visible = 1
+            # Do not force Application.Visible here.
+            #
+            # In practice, PowerPoint can export to PDF while remaining hidden when the presentation is
+            # opened with WithWindow=False, and some Office versions reject setting Visible=0 with
+            # "Hiding the application window is not allowed." Forcing Visible=1 causes UI to appear
+            # during conversions, so we leave the default as-is and let the strategy handle any
+            # format-specific fallbacks if needed.
             self.logger.debug("Created PowerPoint COM application instance")
         except Exception as e:
             self.logger.error(f"Failed to create PowerPoint application: {e}")

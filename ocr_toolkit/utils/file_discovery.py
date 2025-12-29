@@ -104,6 +104,12 @@ def _safe_recursive_search(base_path: Path, supported_extensions: set[str], max_
                             file_relative_paths[file_path] = str(rel_path).replace('\\', '/')
                     elif item.is_dir() and not item.is_symlink():
                         # Recursively search subdirectories (skip symlinks for safety)
+                        # Skip default output directory to avoid re-processing generated files on
+                        # repeated runs (e.g., converting a directory twice should not pick up
+                        # the previous `markdown_output/` results).
+                        if item.name.lower() == config.DEFAULT_MARKDOWN_OUTPUT_DIR.lower():
+                            logging.debug(f"Skipping output directory: {item}")
+                            continue
                         _search_recursive(item, current_depth + 1)
                 except (PermissionError, OSError) as e:
                     logging.warning(f"Cannot access item {item}: {e}")

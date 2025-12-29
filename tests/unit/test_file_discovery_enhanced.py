@@ -7,6 +7,7 @@ import tempfile
 import pytest
 from pathlib import Path
 
+from ocr_toolkit import config
 from ocr_toolkit.utils.file_discovery import discover_files, get_output_file_path
 
 
@@ -33,6 +34,21 @@ class TestEnhancedFileDiscovery:
         # Check relative paths
         assert "file1.pdf" in relative_paths.values()
         assert "subdir/file2.pdf" in relative_paths.values() or "subdir\\file2.pdf" in relative_paths.values()
+
+    def test_discover_files_skips_default_output_dir(self, tmp_path):
+        """Test that the default output directory is skipped during recursive discovery."""
+        output_dir = tmp_path / config.DEFAULT_MARKDOWN_OUTPUT_DIR
+        output_dir.mkdir()
+
+        # Generated output that should not be re-processed.
+        (output_dir / "generated.pdf").write_text("generated")
+        # Real input that should be processed.
+        (tmp_path / "input.pdf").write_text("input")
+
+        files, _base_dir, _relative_paths = discover_files(str(tmp_path))
+
+        assert str(tmp_path / "input.pdf") in files
+        assert str(output_dir / "generated.pdf") not in files
     
     def test_discover_files_non_recursive(self, tmp_path):
         """Test non-recursive search when explicitly disabled.""" 

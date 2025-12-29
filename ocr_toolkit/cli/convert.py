@@ -34,6 +34,12 @@ from ..utils import (
 )
 
 
+def _apply_threads_env(threads: int | None) -> None:
+    if threads and threads > 0:
+        os.environ["OMP_NUM_THREADS"] = str(threads)
+        os.environ["MKL_NUM_THREADS"] = str(threads)
+
+
 def create_parser():
     """Create argument parser for convert command."""
     epilog = """
@@ -157,6 +163,20 @@ def main():
     configure_logging_level(args)
 
     try:
+        # Auto defaults for Chinese (CnOCR) mode: threads=8, batch_size=32 unless explicitly overridden
+        if getattr(args, "zh", False):
+            if args.threads is None:
+                args.threads = 8
+                logging.debug("Defaulting threads to 8 for --zh mode")
+            try:
+                if args.batch_size == config.DEFAULT_BATCH_SIZE:
+                    args.batch_size = 32
+                    logging.debug("Defaulting batch_size to 32 for --zh mode")
+            except Exception:
+                pass
+
+        _apply_threads_env(getattr(args, "threads", None))
+
         # Record start time for performance monitoring
         conversion_start_time = time.time()
 
@@ -204,9 +224,13 @@ def main():
             except Exception:
                 cuda_available = False
 
-            logging.info(f"Loading OCR model (det_arch={ocr_args.det_arch}, reco_arch={ocr_args.reco_arch})...")
-            logging.info(f"CPU flag: {ocr_args.cpu}, CUDA available: {cuda_available}")
-            ocr_model = load_ocr_model(ocr_args.det_arch, ocr_args.reco_arch, ocr_args.cpu)
+            ocr_model = None
+            if not getattr(args, "zh", False):
+                logging.info(f"Loading OCR model (det_arch={ocr_args.det_arch}, reco_arch={ocr_args.reco_arch})...")
+                logging.info(f"CPU flag: {ocr_args.cpu}, CUDA available: {cuda_available}")
+                ocr_model = load_ocr_model(ocr_args.det_arch, ocr_args.reco_arch, ocr_args.cpu)
+            else:
+                logging.info("CnOCR mode enabled; skipping doctr model load.")
 
             # Import lazily to avoid pulling in heavy OCR deps on non-OCR workloads.
             from .. import ocr_processor_wrapper
@@ -277,7 +301,7 @@ def main():
 
                 if processor is not None:
                     # Use wrapper's backward-compatible interface
-                    result = processor.process_document(file_path, ocr_args)
+                    result = processor.process_document(file_path, args)
                 else:
                     # Light path: handle text / xlsx without loading OCR model.
                     start_time = time.time()
@@ -364,6 +388,19 @@ def main():
 
                 if not result.get('success') and result.get('error'):
                     logging.warning(f"  -> Error details: {result['error']}")
+
+                if getattr(args, "profile", False):
+                    profile = result.get("ocr_result", {}).get("metadata", {}).get("profile")
+                    if isinstance(profile, dict) and profile:
+                        logging.info("  -> Profile breakdown:")
+                        for name, data in sorted(
+                            profile.items(),
+                            key=lambda kv: float(kv[1].get("total_s", 0.0)),
+                            reverse=True,
+                        ):
+                            total_s = float(data.get("total_s", 0.0))
+                            count = int(data.get("count", 0))
+                            logging.info(f"     - {name}: {total_s:.3f}s (n={count})")
 
                 return result, pages
 

@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch, MagicMock
 # Add project root to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from ocr_toolkit.cli import convert, extract
+from ocr_toolkit.cli import convert, extract, search
 
 
 class TestCLICommands:
@@ -65,6 +65,12 @@ class TestCLICommands:
         parser = extract.create_parser()
         assert parser is not None
         assert parser.prog == 'ocr-extract'
+
+    def test_search_create_parser(self):
+        """Test search command parser creation."""
+        parser = search.create_parser()
+        assert parser is not None
+        assert parser.prog == 'ocr-search'
         
     @patch('ocr_toolkit.cli.extract.load_ocr_model')
     @patch('ocr_toolkit.cli.extract.discover_files')
@@ -106,3 +112,31 @@ class TestCLICommands:
         except SystemExit as e:
             # argparse exits with code 0 for help
             assert e.code == 0
+
+    def test_search_help_functionality(self):
+        """Test that search command can show help without errors."""
+        parser = search.create_parser()
+        try:
+            parser.parse_args(['--help'])
+        except SystemExit as e:
+            assert e.code == 0
+
+    def test_search_missing_optional_dependencies(self, monkeypatch, capsys):
+        """Test that search command prints install guidance when optional deps are missing."""
+        real_import_module = search.importlib.import_module
+
+        def fake_import_module(name, package=None):
+            if name == "pikepdf":
+                raise ModuleNotFoundError("No module named 'pikepdf'", name="pikepdf")
+            return real_import_module(name, package=package)
+
+        monkeypatch.setattr(search.importlib, "import_module", fake_import_module)
+
+        with patch("sys.argv", ["ocr-search", "input.pdf", "output.pdf"]):
+            with pytest.raises(SystemExit) as exc_info:
+                search.main()
+            assert exc_info.value.code == 1
+
+        captured = capsys.readouterr()
+        assert ".[search]" in captured.err
+        assert "ocr-cli[search]" in captured.err

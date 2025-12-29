@@ -231,7 +231,7 @@ class QualityEvaluator:
         method = comparison['chosen_method'].upper()
         reason = comparison['selection_reason']
 
-        summary = f"📄 {file_name}: Selected {method} - {reason}"
+        summary = f"{file_name}: Selected {method} - {reason}"
 
         if comparison['markitdown_available'] and comparison['ocr_available']:
             md_score = comparison['markitdown_score']

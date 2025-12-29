@@ -28,7 +28,6 @@ dependencies = [
     "torch>=2.7.0",
     "torchvision>=0.18.0",
     "python-doctr>=1.0.0",
-    "ocrmypdf",
     "pdf2image",
     # Use NumPy 2.0 to resolve MINGW-W64 Windows build issues
     "numpy>=2.0.0,<3.0.0",
@@ -47,6 +46,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+search = [
+    "ocrmypdf",
+]
 test = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
