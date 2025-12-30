@@ -14,6 +14,7 @@ The module has been refactored following high-cohesion, low-coupling principles:
 
 import logging
 import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,7 @@ from typing import Any
 from .strategies import (
     DocxToPdfStrategy,
     ExcelComStrategy,
+    LibreOfficeStrategy,
     PowerPointComStrategy,
     WordComStrategy,
 )
@@ -41,12 +43,17 @@ class OfficeConverter:
 
     def __init__(self):
         """Initialize converter with available strategies."""
-        self.strategies = [
-            DocxToPdfStrategy(),
-            WordComStrategy(),
-            PowerPointComStrategy(),
-            ExcelComStrategy()
-        ]
+        if sys.platform.startswith("linux"):
+            # On Linux, use LibreOffice as the primary Office conversion method.
+            self.strategies = [LibreOfficeStrategy()]
+        else:
+            # On Windows/macOS, keep existing strategies (Word/Office dependent).
+            self.strategies = [
+                DocxToPdfStrategy(),
+                WordComStrategy(),
+                PowerPointComStrategy(),
+                ExcelComStrategy(),
+            ]
         self.logger = logging.getLogger(__name__)
 
     def convert_to_pdf(self, input_path: str, output_path: str) -> dict[str, Any]:
@@ -66,8 +73,8 @@ class OfficeConverter:
         """
         ext = Path(input_path).suffix.lower()
 
-        # For .docx files, try docx2pdf first, then fall back to COM
-        if ext == '.docx':
+        # For .docx files on Windows/macOS, try docx2pdf first, then fall back to COM
+        if ext == '.docx' and not sys.platform.startswith("linux"):
             return self._convert_docx_with_fallback(input_path, output_path)
 
         # For other formats, find the appropriate strategy
@@ -153,6 +160,8 @@ class OfficeConverter:
         for strategy in self.strategies:
             if isinstance(strategy, DocxToPdfStrategy):
                 formats.add('.docx')
+            elif isinstance(strategy, LibreOfficeStrategy):
+                formats.update(['.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx'])
             elif isinstance(strategy, WordComStrategy):
                 formats.update(['.doc', '.docx'])
             elif isinstance(strategy, PowerPointComStrategy):

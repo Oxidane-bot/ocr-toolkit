@@ -21,23 +21,21 @@ classifiers = [
 
 dependencies = [
     # Office document conversion support
-    "docx2pdf>=0.1.8",
+    "docx2pdf>=0.1.8; sys_platform == 'win32' or sys_platform == 'darwin'",
     "pywin32>=311; sys_platform == 'win32'",
     "openpyxl>=3.1.5",
     # OCR support (for scanned documents)
     "torch>=2.7.0",
     "torchvision>=0.18.0",
     "python-doctr>=1.0.0",
-    "pdf2image",
     # Use NumPy 2.0 to resolve MINGW-W64 Windows build issues
     "numpy>=2.0.0,<3.0.0",
     "scikit-image",
     # Core utilities
     "tqdm",
     "psutil>=7.0.0",
-    # Let dependencies choose their preferred OpenCV version
-    # "opencv-python>=4.8.0,<4.9.0",  # Removed - let EasyOCR/doctr choose
-    "easyocr>=1.7.2",
+    # Pin OpenCV to a NumPy 2 compatible build (required by python-doctr)
+    "opencv-python>=4.11.0.86,<5.0.0",
     # Prefer GPU ONNX Runtime only (pin to 1.20.x)
     "onnxruntime-gpu>=1.20.0,<1.21.0",
     "cnocr[ort-gpu]>=2.3.2.1",

@@ -127,6 +127,7 @@ benchmark_results/
 
 # Temporary files
 *temp*
+!ocr_toolkit/utils/temp_file_manager.py
 *.tmp
 temp_pdfs/
 
@@ -138,6 +139,9 @@ logs/
 markdown_output/
 ocr_output/
 converted/
+
+# Local tooling (downloaded binaries, extracted deps, etc.)
+.tools/
 
 # Personal documents and test files
 module*/

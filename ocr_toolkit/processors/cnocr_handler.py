@@ -58,7 +58,7 @@ class CnOCRHandler:
             original_path = os.environ.get('PATH', '')
             script_dir = os.path.dirname(sys.executable)
             if script_dir not in original_path:
-                os.environ['PATH'] = f"{script_dir};{original_path}"
+                os.environ['PATH'] = f"{script_dir}{os.pathsep}{original_path}"
                 self.logger.debug(f"Added {script_dir} to PATH for huggingface-cli access")
 
             # Set UTF-8 encoding for Windows console to avoid Unicode errors

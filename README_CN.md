@@ -83,6 +83,11 @@ uv tool install --extra-index-url https://download.pytorch.org/whl/cu128 --index
 - Windows用户: 确保NVIDIA驱动是最新版本
 
 **Windows用户**: 建议安装Microsoft Office以获得最佳DOCX/PPTX支持。
+**Linux用户**: 建议安装 LibreOffice（提供 `soffice`）用于 Office 文档转换：
+- Debian/Ubuntu（桌面环境）：`sudo apt-get install libreoffice`
+- Debian/Ubuntu（无头/CI）：`sudo apt-get install libreoffice-nogui`
+- 如果遇到 `X11 error: Can't open display`，请安装 `-nogui` 套件，或用 `xvfb-run` 运行（`sudo apt-get install xvfb`）
+- 中文/日韩文档渲染更完整：`sudo apt-get install fonts-noto-cjk`
 
 ## 🎯 快速开始
 
