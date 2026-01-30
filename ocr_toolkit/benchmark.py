@@ -2,7 +2,7 @@
 Benchmark runner for OCR performance.
 
 This module backs the `ocr-bench` CLI. It intentionally focuses on measuring
-end-to-end OCR processing time for a batch of PDF files.
+end-to-end OCR processing time for a batch of PDF files using PaddleOCR-VL.
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from .processors import OCRProcessor
-from .utils import load_ocr_model
 
 
 def _apply_threads_env(threads: int | None) -> None:
@@ -25,11 +24,8 @@ def _apply_threads_env(threads: int | None) -> None:
 
 @dataclass
 class _BenchConfig:
-    det_arch: str
-    reco_arch: str
     batch_size: int
     use_cpu: bool
-    use_zh: bool
     fast: bool
     pages: str | None
     profile: bool
@@ -37,22 +33,17 @@ class _BenchConfig:
 
 
 def _create_processor(cfg: _BenchConfig) -> OCRProcessor:
-    model = None
-    if not cfg.use_zh:
-        model = load_ocr_model(cfg.det_arch, cfg.reco_arch, cfg.use_cpu)
-    return OCRProcessor(model, cfg.batch_size, use_cnocr=cfg.use_zh)
+    use_gpu = not cfg.use_cpu
+    return OCRProcessor(batch_size=cfg.batch_size, use_gpu=use_gpu)
 
 
 def run_benchmark(
     *,
     pdf_files: list[str],
-    det_arch: str,
-    reco_arch: str,
     batch_size: int = 16,
     workers: int = 1,
     use_cpu: bool = False,
     timeout: int = 300,
-    zh: bool = False,
     fast: bool = False,
     pages: str | None = None,
     profile: bool = False,
@@ -75,11 +66,8 @@ def run_benchmark(
         logging.warning("Benchmark workers>1 is not enabled yet; running sequentially.")
 
     cfg = _BenchConfig(
-        det_arch=det_arch,
-        reco_arch=reco_arch,
         batch_size=batch_size,
         use_cpu=use_cpu,
-        use_zh=zh,
         fast=fast,
         pages=pages,
         profile=profile,

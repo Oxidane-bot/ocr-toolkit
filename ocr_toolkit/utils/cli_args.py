@@ -32,30 +32,13 @@ def add_common_ocr_args(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
     parser.add_argument(
         "--cpu",
         action="store_true",
-        help="Force use of CPU even if CUDA is available"
-    )
-    parser.add_argument(
-        "--det-arch",
-        type=str,
-        default=config.DEFAULT_DET_ARCH,
-        help="Detection model architecture to use"
-    )
-    parser.add_argument(
-        "--reco-arch",
-        type=str,
-        default=config.DEFAULT_RECO_ARCH,
-        help="Recognition model architecture to use"
-    )
-    parser.add_argument(
-        "--zh",
-        action="store_true",
-        help="Use CnOCR for Chinese text recognition (better for Chinese documents)"
+        help="Force use of CPU even if GPU is available"
     )
     # Performance-related toggles
     parser.add_argument(
         "--fast",
         action="store_true",
-        help="Enable fast mode (use naive text detection and lighter preprocessing)"
+        help="Enable fast mode (use lighter preprocessing)"
     )
     parser.add_argument(
         "--threads",

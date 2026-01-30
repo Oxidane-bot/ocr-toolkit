@@ -19,18 +19,16 @@ class OCRProcessorWrapper:
     the factory pattern for processor management.
     """
 
-    def __init__(self, ocr_model, batch_size: int = 16, use_zh: bool = False):
+    def __init__(self, batch_size: int = 16, use_gpu: bool = True):
         """
         Initialize the OCR processor wrapper.
 
         Args:
-            ocr_model: Loaded DocTR OCR model
             batch_size: Batch size for OCR processing
-            use_zh: Whether to use CnOCR for Chinese text recognition
+            use_gpu: Whether to use GPU for PaddleOCR-VL processing
         """
-        self.ocr_model = ocr_model
         self.batch_size = batch_size
-        self.use_zh = use_zh
+        self.use_gpu = use_gpu
         self.logger = logging.getLogger(__name__)
         self.temp_manager = get_temp_manager()
 
@@ -38,9 +36,8 @@ class OCRProcessorWrapper:
         self.factory = get_processor_factory()
         self.processor = self.factory.create_processor(
             'ocr',
-            ocr_model=ocr_model,
             batch_size=batch_size,
-            use_cnocr=use_zh
+            use_gpu=use_gpu
         )
 
         if not self.processor:
@@ -112,16 +109,15 @@ class OCRProcessorWrapper:
         return self.get_statistics()
 
 
-def create_ocr_processor_wrapper(ocr_model, batch_size: int = 16, use_zh: bool = False) -> OCRProcessorWrapper:
+def create_ocr_processor_wrapper(batch_size: int = 16, use_gpu: bool = True) -> OCRProcessorWrapper:
     """
     Create an OCR processor wrapper instance.
 
     Args:
-        ocr_model: Loaded DocTR OCR model
         batch_size: Batch size for OCR processing
-        use_zh: Whether to use CnOCR for Chinese text recognition
+        use_gpu: Whether to use GPU for PaddleOCR-VL processing
 
     Returns:
         OCRProcessorWrapper instance
     """
-    return OCRProcessorWrapper(ocr_model, batch_size=batch_size, use_zh=use_zh)
+    return OCRProcessorWrapper(batch_size=batch_size, use_gpu=use_gpu)

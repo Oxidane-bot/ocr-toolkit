@@ -29,7 +29,7 @@ class ProcessingStats:
         Add a processing result to the statistics.
 
         Args:
-            method: Processing method used ('ocr', 'cnocr', etc.)
+            method: Processing method used ('ocr')
             success: Whether processing was successful
             processing_time: Time taken for processing
             pages: Number of pages processed in this document

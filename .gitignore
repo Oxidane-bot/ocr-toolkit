@@ -46,6 +46,12 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+tmp_pytest*/
+tmp_pytest_basetemp/
+
+# Test scripts
+test_paddleocr_vl.py
+model_comparison_test.py
 
 # Jupyter Notebook
 .ipynb_checkpoints

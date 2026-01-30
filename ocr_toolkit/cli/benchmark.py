@@ -68,20 +68,6 @@ def main():
     configure_logging_level(args)
 
     try:
-        if getattr(args, "zh", False):
-            if args.threads is None:
-                args.threads = 8
-                logging.debug("Defaulting threads to 8 for --zh mode")
-
-            try:
-                from .. import config
-
-                if args.batch_size == config.DEFAULT_BATCH_SIZE:
-                    args.batch_size = 32
-                    logging.debug("Defaulting batch_size to 32 for --zh mode")
-            except Exception:
-                pass
-
         if getattr(args, "threads", None):
             os.environ["OMP_NUM_THREADS"] = str(args.threads)
             os.environ["MKL_NUM_THREADS"] = str(args.threads)
@@ -101,8 +87,6 @@ def main():
             logging.info(f"Limited to first {len(pdf_files)} files")
 
         logging.info("Starting OCR benchmark...")
-        logging.info(f"Detection model: {args.det_arch}")
-        logging.info(f"Recognition model: {args.reco_arch}")
         logging.info(f"Batch size: {args.batch_size}")
         logging.info(f"Workers: {args.workers}")
         logging.info(f"Using {'GPU' if not args.cpu else 'CPU'}")
@@ -111,13 +95,10 @@ def main():
         # Run benchmark
         results = benchmark.run_benchmark(
             pdf_files=pdf_files,
-            det_arch=args.det_arch,
-            reco_arch=args.reco_arch,
             batch_size=args.batch_size,
             workers=args.workers,
             use_cpu=args.cpu,
             timeout=args.timeout,
-            zh=getattr(args, "zh", False),
             fast=getattr(args, "fast", False),
             pages=getattr(args, "pages", None),
             profile=getattr(args, "profile", False),

@@ -2,26 +2,11 @@
 Configuration module for OCR toolkit.
 
 This module contains default configuration values used across the OCR toolkit,
-including model architectures, processing parameters, output directories, and supported file formats.
+including processing parameters, output directories, and supported file formats.
+
+For PaddleOCR-VL, models are managed internally by the library.
 """
 
-
-# Default OCR model architectures
-DEFAULT_DET_ARCH = "linknet_resnet18"
-"""str: Default detection model architecture.
-
-Updated to linknet_resnet18 based on quality comparison testing results.
-This model provides the best text recognition accuracy for document processing.
-Alternative options include 'fast_tiny', 'db_resnet50', 'db_mobilenet_v3_large', etc.
-"""
-
-DEFAULT_RECO_ARCH = "crnn_vgg16_bn"
-"""str: Default recognition model architecture.
-
-Updated to crnn_vgg16_bn based on quality comparison testing results.
-This model provides superior text recognition accuracy with acceptable performance.
-Alternative options include 'crnn_mobilenet_v3_small', 'master', 'sar_resnet31', etc.
-"""
 
 # Default processing parameters
 DEFAULT_BATCH_SIZE = 16

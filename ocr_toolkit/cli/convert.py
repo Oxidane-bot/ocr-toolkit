@@ -163,18 +163,6 @@ def main():
     configure_logging_level(args)
 
     try:
-        # Auto defaults for Chinese (CnOCR) mode: threads=8, batch_size=32 unless explicitly overridden
-        if getattr(args, "zh", False):
-            if args.threads is None:
-                args.threads = 8
-                logging.debug("Defaulting threads to 8 for --zh mode")
-            try:
-                if args.batch_size == config.DEFAULT_BATCH_SIZE:
-                    args.batch_size = 32
-                    logging.debug("Defaulting batch_size to 32 for --zh mode")
-            except Exception:
-                pass
-
         _apply_threads_env(getattr(args, "threads", None))
 
         # Record start time for performance monitoring
@@ -202,8 +190,6 @@ def main():
 
         # Prepare OCR arguments, using passed args or falling back to defaults
         ocr_args = Namespace(
-            det_arch=args.det_arch or config.DEFAULT_DET_ARCH,
-            reco_arch=args.reco_arch or config.DEFAULT_RECO_ARCH,
             batch_size=args.batch_size,
             cpu=args.cpu
         )
@@ -212,32 +198,21 @@ def main():
         model_required_exts = {
             '.pdf',
             '.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif',
-            '.doc', '.docx', '.ppt', '.pptx', '.xls'
+            '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx'
         }
         needs_ocr_model = any(Path(p).suffix.lower() in model_required_exts for p in files_to_process)
 
         processor = None
         if needs_ocr_model:
-            try:
-                import torch
-                cuda_available = torch.cuda.is_available()
-            except Exception:
-                cuda_available = False
-
-            ocr_model = None
-            if not getattr(args, "zh", False):
-                logging.info(f"Loading OCR model (det_arch={ocr_args.det_arch}, reco_arch={ocr_args.reco_arch})...")
-                logging.info(f"CPU flag: {ocr_args.cpu}, CUDA available: {cuda_available}")
-                ocr_model = load_ocr_model(ocr_args.det_arch, ocr_args.reco_arch, ocr_args.cpu)
-            else:
-                logging.info("CnOCR mode enabled; skipping doctr model load.")
+            # Verify PaddlePaddle installation
+            logging.info("Verifying PaddlePaddle installation...")
+            load_ocr_model(use_cpu=ocr_args.cpu)
 
             # Import lazily to avoid pulling in heavy OCR deps on non-OCR workloads.
             from .. import ocr_processor_wrapper
             processor = ocr_processor_wrapper.create_ocr_processor_wrapper(
-                ocr_model,
                 batch_size=ocr_args.batch_size,
-                use_zh=getattr(args, 'zh', False)
+                use_gpu=not ocr_args.cpu
             )
         else:
             logging.info("No OCR-required formats detected; skipping OCR model load.")

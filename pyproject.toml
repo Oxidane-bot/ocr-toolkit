@@ -24,31 +24,30 @@ dependencies = [
     "docx2pdf>=0.1.8",
     "pywin32>=311; sys_platform == 'win32'",
     "openpyxl>=3.1.5",
-    # OCR support (for scanned documents)
-    "torch>=2.7.0",
-    "torchvision>=0.18.0",
-    "python-doctr>=1.0.0",
+    # PaddleOCR 3.x for OCR processing (requires PaddlePaddle 3.0+)
+    # Note: PaddlePaddle 3.x is not on PyPI, installed from official source
+    "paddleocr>=3.0.0",
     "pdf2image",
+    "pypdfium2>=4.30.0",
     # Use NumPy 2.0 to resolve MINGW-W64 Windows build issues
     "numpy>=2.0.0,<3.0.0",
     "scikit-image",
     # Core utilities
     "tqdm",
     "psutil>=7.0.0",
-    # Let dependencies choose their preferred OpenCV version
-    # "opencv-python>=4.8.0,<4.9.0",  # Removed - let EasyOCR/doctr choose
-    "easyocr>=1.7.2",
-    # Prefer GPU ONNX Runtime only (pin to 1.20.x)
-    "onnxruntime-gpu>=1.20.0,<1.21.0",
-    "cnocr[ort-gpu]>=2.3.2.1",
-    # Hugging Face Hub for model downloads (required by CnOCR)
-    "huggingface-hub[cli]>=0.28.0",
 ]
 
+# PaddlePaddle 3.x must be installed from official source (not on PyPI)
+#
+# For Windows with RTX 50-series GPUs and Python 3.12:
+#   uv pip install paddlepaddle-gpu==3.2.1 -i https://www.paddlepaddle.org.cn/packages/stable/cu129/
+#
+# For global tool installation with PaddlePaddle GPU support:
+#   uv tool install -e . --with "paddlepaddle-gpu==3.2.1" --extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cu129/ --index-strategy unsafe-best-match
+#
+# For other configurations, visit: https://www.paddlepaddle.org.cn/install/quick
+
 [project.optional-dependencies]
-search = [
-    "ocrmypdf",
-]
 test = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
@@ -56,17 +55,23 @@ test = [
 ]
 dev = [
     "pytest>=7.0.0",
-    "pytest-cov>=4.0.0", 
+    "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
     "black>=23.0.0",
     "flake8>=6.0.0",
     "mypy>=1.0.0",
 ]
+# PaddleOCR-VL support via transformers
+vl = [
+    "transformers==4.55.0",
+    "huggingface-hub>=0.34.0,<1.0",
+    "torch>=2.0.0",
+    "accelerate",
+    "safetensors",
+]
 
 [project.scripts]
 ocr-convert = "ocr_toolkit.cli.convert:main"
-ocr-extract = "ocr_toolkit.cli.extract:main"
-ocr-search = "ocr_toolkit.cli.search:main"
 ocr-bench = "ocr_toolkit.cli.benchmark:main"
 
 [project.urls]
@@ -75,7 +80,6 @@ Repository = "https://github.com/USER/ocr-toolkit.git"
 Issues = "https://github.com/USER/ocr-toolkit/issues"
 
 [tool.uv]
-extra-index-url = ["https://download.pytorch.org/whl/cu128"]
 # NumPy 2.0 resolves MINGW-W64 Windows build issues
 index-strategy = "unsafe-best-match"
 

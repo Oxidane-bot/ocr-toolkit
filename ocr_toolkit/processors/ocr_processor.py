@@ -5,7 +5,7 @@ This module provides a clean, reusable OCR processor that follows
 the FileProcessorBase interface for consistent behavior.
 
 The processor has been refactored following high-cohesion, low-coupling principles:
-- CnOCR handling: cnocr_handler.py
+- PaddleOCR 3.x handling: paddleocr_handler.py
 - Document loading: document_loader.py
 - Text file processing: text_file_processor.py
 - Excel data extraction: excel_processor.py
@@ -16,14 +16,12 @@ import os
 import time
 from pathlib import Path
 
-from doctr.io import DocumentFile
-
 from ..utils import get_temp_manager
 from ..utils.profiling import Profiler
 from .base import FileProcessorBase, ProcessingResult
-from .cnocr_handler import CnOCRHandler
 from .document_loader import DocumentLoader
 from .excel_processor import ExcelDataProcessor
+from .paddleocr_handler import PaddleOCRHandler
 from .text_file_processor import TextFileProcessor
 
 
@@ -36,7 +34,7 @@ def cleanup_temp_files(paths: list[str]) -> None:
 
 class OCRProcessor(FileProcessorBase):
     """
-    OCR processor implementation using DocTR and optionally CnOCR.
+    OCR processor implementation using PaddleOCR 3.x.
 
     This processor handles OCR processing for PDFs, images, Office documents,
     and text files with proper temporary file management and error handling.
@@ -45,24 +43,22 @@ class OCRProcessor(FileProcessorBase):
     - Delegates document loading to DocumentLoader
     - Delegates text file processing to TextFileProcessor
     - Delegates Excel data extraction to ExcelDataProcessor
-    - Delegates CnOCR processing to CnOCRHandler
-    - Handles DocTR OCR processing internally
+    - Uses PaddleOCR 3.x for OCR processing
     - Coordinates overall processing workflow
     """
 
-    def __init__(self, ocr_model, batch_size: int = 16, use_cnocr: bool = False, use_direct_excel: bool = True):
+    def __init__(self, batch_size: int = 16, use_gpu: bool = True, use_direct_excel: bool = True):
         """
         Initialize OCR processor.
 
         Args:
-            ocr_model: Loaded DocTR OCR model
-            batch_size: Number of pages to process in each batch
-            use_cnocr: Whether to use CnOCR for Chinese text recognition (better for Chinese documents)
+            batch_size: Number of pages to process in each batch (for compatibility)
+            use_gpu: Whether to use GPU for PaddleOCR processing
             use_direct_excel: Whether to use direct Excel data extraction (faster, no Excel install needed)
         """
         super().__init__()
-        self.ocr_model = ocr_model
         self.batch_size = batch_size
+        self.use_gpu = use_gpu
         self.logger = logging.getLogger(__name__)
         self.temp_manager = get_temp_manager()
 
@@ -76,25 +72,8 @@ class OCRProcessor(FileProcessorBase):
         if use_direct_excel:
             self.excel_processor = ExcelDataProcessor()
 
-        # Initialize CnOCR handler if requested
-        self.cnocr_handler = None
-        self.use_cnocr = use_cnocr
-        if use_cnocr:
-            self._initialize_cnocr_handler()
-
-    def _initialize_cnocr_handler(self) -> None:
-        """Initialize CnOCR handler for Chinese text recognition."""
-        try:
-            self.cnocr_handler = CnOCRHandler(batch_size=self.batch_size)
-            if not self.cnocr_handler.is_available():
-                self.logger.warning("CnOCR handler initialized but not available, falling back to DocTR")
-                self.use_cnocr = False
-                self.cnocr_handler = None
-        except Exception as e:
-            self.logger.error(f"Failed to initialize CnOCR handler: {e}")
-            self.logger.info("Falling back to DocTR for OCR processing")
-            self.use_cnocr = False
-            self.cnocr_handler = None
+        # Initialize PaddleOCR handler
+        self.paddleocr_handler = PaddleOCRHandler(use_gpu=use_gpu)
 
     def get_supported_formats(self) -> list[str]:
         """Get list of supported file formats for OCR processing."""
@@ -162,41 +141,34 @@ class OCRProcessor(FileProcessorBase):
                     self.logger.warning(f"Excel data extraction failed for {file_path}: {excel_result.error}")
                     self.logger.info(f"Falling back to PDF conversion for {file_path}")
 
-            # Load document for OCR processing
-            doc = self.document_loader.load_document(
-                file_path,
-                result,
+            # Process with PaddleOCR (handles PDFs and images directly)
+            # For Office documents, they need to be converted to PDF first
+            if ext in DocumentLoader.OFFICE_FORMATS:
+                # Convert Office document to PDF first
+                office_converter = self.document_loader.office_converter
+                temp_pdf = office_converter.create_temp_pdf(file_path)
+
+                if not temp_pdf:
+                    result.error = f'Failed to convert Office document to PDF: {file_path}'
+                    result.processing_time = time.time() - start_time
+                    return result
+
+                result.temp_files.append(temp_pdf)
+                process_path = temp_pdf
+            else:
+                process_path = file_path
+
+            # Process with PaddleOCR
+            content, metadata = self.paddleocr_handler.process_document(
+                process_path,
                 pages=pages,
-                fast=fast,
                 profiler=profiler,
             )
-            if doc is None:
-                result.processing_time = time.time() - start_time
-                return result
-
-            # Process with OCR (choose between CnOCR and DocTR)
-            page_numbers = result.metadata.get("page_numbers")
-            actual_ext = result.metadata.get("converted_format", ext)
-            if self._should_use_cnocr(actual_ext):
-                content = self.cnocr_handler.process_document(
-                    doc,
-                    file_path,
-                    ext,
-                    page_numbers=page_numbers,
-                    profiler=profiler,
-                )
-            else:
-                content = self._process_with_doctr(
-                    doc,
-                    file_path,
-                    ext,
-                    page_numbers=page_numbers,
-                    profiler=profiler,
-                )
 
             result.content = content
             result.success = True
-            result.pages = len(doc) if doc else 1
+            result.pages = metadata.get('page_count', 1)
+            result.metadata.update(metadata)
 
             self.logger.debug(f"OCR processed {file_path} successfully with {result.pages} pages")
 
@@ -213,102 +185,3 @@ class OCRProcessor(FileProcessorBase):
 
         result.processing_time = time.time() - start_time
         return result
-
-    def _should_use_cnocr(self, ext: str) -> bool:
-        """
-        Determine whether to use CnOCR for the given format.
-
-        Args:
-            ext: File extension
-
-        Returns:
-            True if CnOCR should be used, False otherwise
-        """
-        # Only use CnOCR if:
-        # 1. CnOCR is enabled and available
-        # 2. The format is supported by CnOCR (images and PDFs)
-        if not self.use_cnocr or not self.cnocr_handler:
-            return False
-
-        cnocr_supported = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif', '.pdf'}
-        return ext in cnocr_supported
-
-    def _process_with_doctr(
-        self,
-        doc: DocumentFile,
-        file_path: str,
-        ext: str,
-        *,
-        page_numbers: list[int] | None = None,
-        profiler: Profiler | None = None,
-    ) -> str:
-        """
-        Process loaded document with DocTR OCR model.
-
-        Args:
-            doc: Loaded DocumentFile
-            file_path: Original file path
-            ext: File extension
-
-        Returns:
-            Processed markdown content
-        """
-        markdown_content = []
-
-        # Process in batches
-        for i in range(0, len(doc), self.batch_size):
-            batch = doc[i : i + self.batch_size]
-            try:
-                import torch
-                inference_ctx = (
-                    torch.inference_mode() if hasattr(torch, "inference_mode") else torch.no_grad()
-                )
-            except Exception:
-                from contextlib import nullcontext
-                inference_ctx = nullcontext()
-
-            if profiler:
-                with profiler.track("doctr_inference", count=len(batch)):
-                    with inference_ctx:
-                        ocr_result = self.ocr_model(batch)
-            else:
-                with inference_ctx:
-                    ocr_result = self.ocr_model(batch)
-
-            for page_idx, page_result in enumerate(ocr_result.pages):
-                current_page_number = (
-                    page_numbers[i + page_idx]
-                    if page_numbers and (i + page_idx) < len(page_numbers)
-                    else i + page_idx + 1
-                )
-                if profiler:
-                    with profiler.track("doctr_render_text"):
-                        text = page_result.render()
-                else:
-                    text = page_result.render()
-
-                # Format content based on file type
-                formatted_text = self._format_page_content(text, current_page_number, file_path, ext)
-                markdown_content.append(formatted_text)
-
-        return "\n\n".join(markdown_content)
-
-    def _format_page_content(self, text: str, page_number: int, file_path: str, ext: str) -> str:
-        """
-        Format page content as markdown.
-
-        Args:
-            text: OCR extracted text
-            page_number: Page number (1-based)
-            file_path: Original file path
-            ext: File extension
-
-        Returns:
-            Formatted markdown string
-        """
-        # For single images, use filename as header
-        if ext in {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif'}:
-            return f"# {os.path.basename(file_path)}\n\n{text}"
-
-        # For multi-page documents, use page numbers
-        return f"## Page {page_number}\n\n{text}"
