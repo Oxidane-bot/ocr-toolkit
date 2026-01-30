@@ -176,7 +176,8 @@ class OCRProcessor(FileProcessorBase):
 
             # Process with OCR (choose between CnOCR and DocTR)
             page_numbers = result.metadata.get("page_numbers")
-            if self._should_use_cnocr(ext):
+            actual_ext = result.metadata.get("converted_format", ext)
+            if self._should_use_cnocr(actual_ext):
                 content = self.cnocr_handler.process_document(
                     doc,
                     file_path,

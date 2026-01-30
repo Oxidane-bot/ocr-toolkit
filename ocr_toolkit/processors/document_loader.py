@@ -273,6 +273,7 @@ class DocumentLoader:
         # Track temp file for cleanup
         if result:
             result.temp_files.append(temp_pdf)
+            result.metadata["converted_format"] = ".pdf"
 
         # Load the converted PDF
         doc = self._load_pdf(temp_pdf, pages=pages, fast=fast, result=result, profiler=profiler)
