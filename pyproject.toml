@@ -24,9 +24,11 @@ dependencies = [
     "docx2pdf>=0.1.8",
     "pywin32>=311; sys_platform == 'win32'",
     "openpyxl>=3.1.5",
-    # PaddleOCR 3.x for OCR processing (requires PaddlePaddle 3.0+)
-    # Note: PaddlePaddle 3.x is not on PyPI, installed from official source
-    "paddleocr>=3.0.0",
+    # PaddlePaddle GPU 3.2.1 (from PaddlePaddle official index)
+    "paddlepaddle-gpu==3.2.1; sys_platform == 'win32'",
+    # PaddleOCR 3.x for OCR processing
+    "paddleocr[doc-parser]>=3.0.0",
+    "opencv-python",
     "pdf2image",
     "pypdfium2>=4.30.0",
     # Use NumPy 2.0 to resolve MINGW-W64 Windows build issues
@@ -36,16 +38,6 @@ dependencies = [
     "tqdm",
     "psutil>=7.0.0",
 ]
-
-# PaddlePaddle 3.x must be installed from official source (not on PyPI)
-#
-# For Windows with RTX 50-series GPUs and Python 3.12:
-#   uv pip install paddlepaddle-gpu==3.2.1 -i https://www.paddlepaddle.org.cn/packages/stable/cu129/
-#
-# For global tool installation with PaddlePaddle GPU support:
-#   uv tool install -e . --with "paddlepaddle-gpu==3.2.1" --extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cu129/ --index-strategy unsafe-best-match
-#
-# For other configurations, visit: https://www.paddlepaddle.org.cn/install/quick
 
 [project.optional-dependencies]
 test = [
@@ -61,14 +53,6 @@ dev = [
     "flake8>=6.0.0",
     "mypy>=1.0.0",
 ]
-# PaddleOCR-VL support via transformers
-vl = [
-    "transformers==4.55.0",
-    "huggingface-hub>=0.34.0,<1.0",
-    "torch>=2.0.0",
-    "accelerate",
-    "safetensors",
-]
 
 [project.scripts]
 ocr-convert = "ocr_toolkit.cli.convert:main"
@@ -82,6 +66,15 @@ Issues = "https://github.com/USER/ocr-toolkit/issues"
 [tool.uv]
 # NumPy 2.0 resolves MINGW-W64 Windows build issues
 index-strategy = "unsafe-best-match"
+
+# Pin PaddlePaddle to official index (all other packages use PyPI)
+[tool.uv.sources]
+paddlepaddle-gpu = { index = "paddle" }
+
+[[tool.uv.index]]
+name = "paddle"
+url = "https://www.paddlepaddle.org.cn/packages/stable/cu129/"
+explicit = true
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]

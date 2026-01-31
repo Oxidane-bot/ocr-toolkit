@@ -191,7 +191,8 @@ def main():
         # Prepare OCR arguments, using passed args or falling back to defaults
         ocr_args = Namespace(
             batch_size=args.batch_size,
-            cpu=args.cpu
+            cpu=args.cpu,
+            engine=getattr(args, 'engine', 'paddleocr')
         )
 
         # Lazily load OCR model only if any file requires it.
@@ -211,7 +212,6 @@ def main():
             # Import lazily to avoid pulling in heavy OCR deps on non-OCR workloads.
             from .. import ocr_processor_wrapper
             processor = ocr_processor_wrapper.create_ocr_processor_wrapper(
-                batch_size=ocr_args.batch_size,
                 use_gpu=not ocr_args.cpu
             )
         else:
@@ -275,6 +275,19 @@ def main():
                 ext = Path(file_path).suffix.lower()
 
                 if processor is not None:
+                    # Calculate output directory for this file (needed for image extraction)
+                    output_file_path = get_output_file_path(
+                        file_path,
+                        args.output_dir,
+                        preserve_structure=args.preserve_structure,
+                        relative_path=relative_path,
+                        base_dir=base_dir
+                    )
+                    output_dir = os.path.dirname(output_file_path)
+
+                    # Add output directory to args for image extraction
+                    args._output_dir = output_dir
+
                     # Use wrapper's backward-compatible interface
                     result = processor.process_document(file_path, args)
                 else:

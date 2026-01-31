@@ -24,27 +24,9 @@ def add_common_ocr_args(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
         The parser with added arguments
     """
     parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=config.DEFAULT_BATCH_SIZE,
-        help="Number of pages to process at a time"
-    )
-    parser.add_argument(
         "--cpu",
         action="store_true",
         help="Force use of CPU even if GPU is available"
-    )
-    # Performance-related toggles
-    parser.add_argument(
-        "--fast",
-        action="store_true",
-        help="Enable fast mode (use lighter preprocessing)"
-    )
-    parser.add_argument(
-        "--threads",
-        type=int,
-        default=None,
-        help="Override OMP/MKL threads for CPU-bound parts (e.g., 8)"
     )
     parser.add_argument(
         "--pages",

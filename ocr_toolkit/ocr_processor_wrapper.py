@@ -1,5 +1,8 @@
 """
 OCR Processor Wrapper that provides enhanced OCR processing capabilities.
+
+This wrapper provides a simplified interface for OCR processing using
+PaddleOCR-VL-1.5 for document structure analysis.
 """
 
 import logging
@@ -7,41 +10,33 @@ import os
 import time
 from typing import Any
 
-from .processors import get_processor_factory
-from .utils import get_temp_manager
-
 
 class OCRProcessorWrapper:
     """
     OCR Processor Wrapper that provides enhanced OCR processing capabilities.
 
     This wrapper provides a simplified interface for OCR processing using
-    the factory pattern for processor management.
+    PaddleOCR-VL-1.5 for document structure analysis.
     """
 
-    def __init__(self, batch_size: int = 16, use_gpu: bool = True):
+    def __init__(self, use_gpu: bool = True):
         """
         Initialize the OCR processor wrapper.
 
         Args:
-            batch_size: Batch size for OCR processing
-            use_gpu: Whether to use GPU for PaddleOCR-VL processing
+            use_gpu: Whether to use GPU for processing
         """
-        self.batch_size = batch_size
         self.use_gpu = use_gpu
         self.logger = logging.getLogger(__name__)
-        self.temp_manager = get_temp_manager()
 
-        # Get processor factory and create OCR processor
-        self.factory = get_processor_factory()
-        self.processor = self.factory.create_processor(
-            'ocr',
-            batch_size=batch_size,
-            use_gpu=use_gpu
-        )
+        # Initialize PaddleOCR-VL handler
+        self._initialize_handler()
 
-        if not self.processor:
-            raise RuntimeError("Failed to create OCR processor")
+    def _initialize_handler(self):
+        """Initialize the PaddleOCR-VL handler."""
+        self.logger.info("Using PaddleOCR-VL-1.5 engine (0.9B VLM for document parsing)")
+        from .processors import PaddleOCRVLHandler
+        self.handler = PaddleOCRVLHandler(use_gpu=self.use_gpu)
 
     def process_document(self, file_path: str, args=None) -> dict[str, Any]:
         """
@@ -57,28 +52,51 @@ class OCRProcessorWrapper:
         start_time = time.time()
 
         try:
-            # Process with OCR processor
-            result = self.processor.process(
+            # Get processing parameters
+            pages = getattr(args, 'pages', None) if args else None
+            profile = getattr(args, 'profile', False) if args else False
+
+            # Use PaddleOCR-VL handler
+            profiler = None
+            if profile:
+                from .utils.profiling import Profiler
+                profiler = Profiler()
+
+            # Get output directory for extracted images
+            output_dir = getattr(args, '_output_dir', None) if args else None
+
+            content, metadata = self.handler.process_document(
                 file_path,
-                fast=getattr(args, 'fast', False) if args else False,
-                pages=getattr(args, 'pages', None) if args else None,
-                profile=getattr(args, 'profile', False) if args else False,
+                output_dir=output_dir,
+                pages=pages,
+                profiler=profiler,
             )
 
-            # Convert to legacy format for compatibility
-            return {
+            processing_time = time.time() - start_time
+
+            result_dict = {
                 'file_path': file_path,
                 'file_name': os.path.basename(file_path),
-                'success': result.success,
-                'chosen_method': 'ocr',
-                'final_content': result.content,
-                'processing_time': result.processing_time,
-                'pages': result.pages,
+                'success': True,
+                'chosen_method': 'paddleocr_vl',
+                'final_content': content,
+                'processing_time': processing_time,
+                'pages': metadata.get('page_count', 1),
                 'comparison': {},
-                'ocr_result': result.to_dict(),
-                'temp_files': result.temp_files,
-                'error': result.error if not result.success else ''
+                'ocr_result': {
+                    'success': True,
+                    'content': content,
+                    'metadata': metadata,
+                    'error': ''
+                },
+                'temp_files': [],
+                'error': ''
             }
+
+            if profiler:
+                result_dict['ocr_result']['metadata']['profile'] = profiler.to_dict()
+
+            return result_dict
 
         except Exception as e:
             self.logger.error(f"OCR processing failed for {file_path}: {e}")
@@ -86,7 +104,7 @@ class OCRProcessorWrapper:
                 'file_path': file_path,
                 'file_name': os.path.basename(file_path),
                 'success': False,
-                'chosen_method': 'ocr',
+                'chosen_method': 'paddleocr_vl',
                 'final_content': '',
                 'processing_time': time.time() - start_time,
                 'pages': 0,
@@ -109,15 +127,14 @@ class OCRProcessorWrapper:
         return self.get_statistics()
 
 
-def create_ocr_processor_wrapper(batch_size: int = 16, use_gpu: bool = True) -> OCRProcessorWrapper:
+def create_ocr_processor_wrapper(use_gpu: bool = True) -> OCRProcessorWrapper:
     """
     Create an OCR processor wrapper instance.
 
     Args:
-        batch_size: Batch size for OCR processing
-        use_gpu: Whether to use GPU for PaddleOCR-VL processing
+        use_gpu: Whether to use GPU for processing
 
     Returns:
         OCRProcessorWrapper instance
     """
-    return OCRProcessorWrapper(batch_size=batch_size, use_gpu=use_gpu)
+    return OCRProcessorWrapper(use_gpu=use_gpu)

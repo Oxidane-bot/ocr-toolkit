@@ -19,113 +19,213 @@ from ocr_toolkit.ocr_processor_wrapper import OCRProcessorWrapper, create_ocr_pr
 
 class TestOCRProcessorWrapper:
     """Test cases for OCRProcessorWrapper class."""
-    
+
     def setup_method(self):
         """Setup test fixtures before each test method."""
-        # Mock OCR model
-        self.mock_ocr_model = Mock()
-        mock_page = Mock()
-        mock_page.render.return_value = "OCR extracted text"
-        mock_result = Mock()
-        mock_result.pages = [mock_page]
-        self.mock_ocr_model.return_value = mock_result
-        
-        # Create processor
-        self.processor = OCRProcessorWrapper(self.mock_ocr_model)
-        
-        # Test arguments
-        self.args = Namespace(batch_size=16)
-        
         # Temporary directories
         self.test_dir = tempfile.mkdtemp()
-        
+
     def teardown_method(self):
         """Cleanup after each test method."""
-        if os.path.exists(self.test_dir):
+        import pathlib
+        test_dir_path = pathlib.Path(self.test_dir)
+        if test_dir_path.exists():
             shutil.rmtree(self.test_dir, ignore_errors=True)
-        
-    def test_init(self):
-        """Test OCRProcessorWrapper initialization."""
-        assert self.processor is not None
-        # Simplified architecture using factory pattern
-        assert hasattr(self.processor, 'processor')
-        assert hasattr(self.processor, 'batch_size')
-        assert hasattr(self.processor, 'use_zh')
-        assert self.processor.batch_size == 16
-        assert self.processor.use_zh == False
-        
-    def test_init_with_chinese_support(self):
-        """Test OCRProcessorWrapper initialization with Chinese support."""
-        processor = OCRProcessorWrapper(self.mock_ocr_model, use_zh=True)
-        assert processor.use_zh == True
-        assert hasattr(processor, 'processor')
-        
-    def test_init_with_custom_evaluator(self):
-        """Test OCRProcessorWrapper initialization with custom evaluator (signature changed)."""
-        # The new OCRProcessorWrapper signature no longer accepts quality_evaluator
-        processor = OCRProcessorWrapper(self.mock_ocr_model)
-        assert processor is not None
-        assert hasattr(processor, 'processor')
-        
+
+    def test_init_default_engine(self):
+        """Test OCRProcessorWrapper initialization with default engine."""
+        # Mock the PaddleOCRVLHandler to avoid actual model loading
+        with patch('ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler') as mock_handler:
+            mock_instance = Mock()
+            mock_instance.is_available.return_value = True
+            mock_handler.return_value = mock_instance
+
+            processor = OCRProcessorWrapper()
+
+            assert processor is not None
+            assert processor.engine == "paddleocr_vl"
+            assert processor.batch_size == 16
+            assert processor.use_gpu is True
+
+    def test_init_paddleocr_engine(self):
+        """Test OCRProcessorWrapper initialization with paddleocr engine."""
+        with patch('ocr_toolkit.processors.paddleocr_handler.PaddleOCRHandler') as mock_handler:
+            mock_instance = Mock()
+            mock_instance.is_available.return_value = True
+            mock_handler.return_value = mock_instance
+
+            processor = OCRProcessorWrapper(engine="paddleocr")
+
+            assert processor.engine == "paddleocr"
+
+    def test_init_doc_understanding_engine(self):
+        """Test OCRProcessorWrapper initialization with doc_understanding engine."""
+        with patch('ocr_toolkit.processors.doc_understanding_handler.DocUnderstandingHandler') as mock_handler:
+            mock_instance = Mock()
+            mock_instance.is_available.return_value = True
+            mock_handler.return_value = mock_instance
+
+            processor = OCRProcessorWrapper(engine="doc_understanding")
+
+            assert processor.engine == "doc_understanding"
+
+    def test_init_with_cpu(self):
+        """Test OCRProcessorWrapper initialization with CPU mode."""
+        with patch('ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler') as mock_handler:
+            mock_instance = Mock()
+            mock_instance.is_available.return_value = True
+            mock_handler.return_value = mock_instance
+
+            processor = OCRProcessorWrapper(use_gpu=False)
+
+            assert processor.use_gpu is False
+
+    def test_init_with_custom_batch_size(self):
+        """Test OCRProcessorWrapper initialization with custom batch size."""
+        with patch('ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler') as mock_handler:
+            mock_instance = Mock()
+            mock_instance.is_available.return_value = True
+            mock_handler.return_value = mock_instance
+
+            processor = OCRProcessorWrapper(batch_size=32)
+
+            assert processor.batch_size == 32
+
+    def test_process_document_success(self):
+        """Test successful document processing."""
+        with patch('ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler') as mock_handler_class:
+            # Setup mock handler
+            mock_handler = Mock()
+            mock_handler.is_available.return_value = True
+            mock_handler.process_document.return_value = ("Test markdown content", {'page_count': 1})
+            mock_handler_class.return_value = mock_handler
+
+            processor = OCRProcessorWrapper()
+
+            # Mock args
+            args = Namespace()
+
+            result = processor.process_document("test.png", args)
+
+            assert result['success'] is True
+            assert result['chosen_method'] == 'paddleocr_vl'
+            assert result['final_content'] == "Test markdown content"
+            assert result['pages'] == 1
+            assert 'ocr_result' in result
+
+    def test_process_document_with_pages(self):
+        """Test document processing with page selection."""
+        with patch('ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler') as mock_handler_class:
+            mock_handler = Mock()
+            mock_handler.is_available.return_value = True
+            mock_handler.process_document.return_value = ("Test content", {'page_count': 2, 'selected_pages': [0, 1]})
+            mock_handler_class.return_value = mock_handler
+
+            processor = OCRProcessorWrapper()
+
+            args = Namespace(pages="1-2")
+
+            result = processor.process_document("test.pdf", args)
+
+            assert result['success'] is True
+            assert result['pages'] == 2
+
+    def test_process_document_with_profile(self):
+        """Test document processing with profiling enabled."""
+        with patch('ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler') as mock_handler_class:
+            mock_handler = Mock()
+            mock_handler.is_available.return_value = True
+            mock_handler.process_document.return_value = ("Test content", {'page_count': 1})
+            mock_handler_class.return_value = mock_handler
+
+            processor = OCRProcessorWrapper()
+
+            args = Namespace(profile=True)
+
+            result = processor.process_document("test.png", args)
+
+            assert result['success'] is True
+
+    def test_process_document_handler_not_available(self):
+        """Test document processing when handler is not available."""
+        with patch('ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler') as mock_handler_class:
+            mock_handler = Mock()
+            mock_handler.is_available.return_value = False
+            mock_handler_class.return_value = mock_handler
+
+            processor = OCRProcessorWrapper()
+
+            args = Namespace()
+
+            result = processor.process_document("test.png", args)
+
+            assert result['success'] is False
+            assert 'handler not available' in result['error'].lower()
+
     def test_get_statistics(self):
         """Test statistics calculation."""
-        stats = self.processor.get_statistics()
-        
-        # New simplified statistics format
-        assert 'ocr_processed' in stats
-        assert 'success_rate' in stats
-        assert stats['ocr_processed'] == 1
-        assert stats['success_rate'] == 100.0
-        
-    def test_get_statistics_empty(self):
-        """Test statistics when no processing has occurred."""
-        stats = self.processor.get_statistics()
-        
-        # New simplified statistics format
-        assert 'ocr_processed' in stats
-        assert 'success_rate' in stats
-        assert stats['ocr_processed'] == 1
-        assert stats['success_rate'] == 100.0
-        
-    def test_create_ocr_processor_wrapper_factory(self):
-        """Test factory function."""
-        processor = create_ocr_processor_wrapper(self.mock_ocr_model)
-        
-        assert isinstance(processor, OCRProcessorWrapper)
-        # New simplified architecture using factory pattern
-        assert hasattr(processor, 'processor')
-        assert not hasattr(processor, 'markitdown_processor')  # No longer exists
-        
-    def test_create_ocr_processor_wrapper_with_chinese_support(self):
-        """Test factory function with Chinese support."""
-        processor = create_ocr_processor_wrapper(self.mock_ocr_model, use_zh=True)
-        
-        assert isinstance(processor, OCRProcessorWrapper)
-        assert processor.use_zh == True
-        assert hasattr(processor, 'processor')
-        
-    def test_process_document(self):
-        """Test document processing."""
-        # Mock OCR processor result
-        mock_ocr_result = Mock()
-        mock_ocr_result.content = "Test content"
-        mock_ocr_result.success = True
-        mock_ocr_result.processing_time = 1.0
-        mock_ocr_result.error = ""
-        mock_ocr_result.temp_files = []
-        mock_ocr_result.to_dict.return_value = {
-            'content': 'Test content',
-            'success': True,
-            'processing_time': 1.0,
-            'temp_files': []
-        }
-        
-        with patch.object(self.processor.processor, 'process', return_value=mock_ocr_result):
-            result = self.processor.process_document("test.pdf", self.args)
-            
-            assert result['success'] == True
-            assert result['chosen_method'] == 'ocr'
-            assert result['final_content'] == 'Test content'
-            assert 'ocr_result' in result
-            # MarkItDown has been removed, only OCR results are returned
-            assert 'markitdown_result' not in result
+        with patch('ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler') as mock_handler_class:
+            mock_handler = Mock()
+            mock_handler.is_available.return_value = True
+            mock_handler.process_document.return_value = ("Test", {'page_count': 1})
+            mock_handler_class.return_value = mock_handler
+
+            processor = OCRProcessorWrapper()
+
+            stats = processor.get_statistics()
+
+            assert 'ocr_processed' in stats
+            assert 'success_rate' in stats
+            assert stats['ocr_processed'] == 1
+            assert stats['success_rate'] == 100.0
+
+    def test_get_detailed_statistics(self):
+        """Test detailed statistics calculation."""
+        with patch('ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler') as mock_handler_class:
+            mock_handler = Mock()
+            mock_handler.is_available.return_value = True
+            mock_handler.process_document.return_value = ("Test", {'page_count': 1})
+            mock_handler_class.return_value = mock_handler
+
+            processor = OCRProcessorWrapper()
+
+            stats = processor.get_detailed_statistics()
+
+            assert 'ocr_processed' in stats
+            assert 'success_rate' in stats
+
+    def test_create_ocr_processor_wrapper_default(self):
+        """Test factory function with default parameters."""
+        with patch('ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler') as mock_handler_class:
+            mock_instance = Mock()
+            mock_instance.is_available.return_value = True
+            mock_handler_class.return_value = mock_instance
+
+            processor = create_ocr_processor_wrapper()
+
+            assert isinstance(processor, OCRProcessorWrapper)
+            assert processor.engine == "paddleocr_vl"
+
+    def test_create_ocr_processor_wrapper_with_engine(self):
+        """Test factory function with custom engine."""
+        with patch('ocr_toolkit.processors.paddleocr_handler.PaddleOCRHandler') as mock_handler_class:
+            mock_instance = Mock()
+            mock_instance.is_available.return_value = True
+            mock_handler_class.return_value = mock_instance
+
+            processor = create_ocr_processor_wrapper(engine="paddleocr")
+
+            assert isinstance(processor, OCRProcessorWrapper)
+            assert processor.engine == "paddleocr"
+
+    def test_create_ocr_processor_wrapper_with_cpu(self):
+        """Test factory function with CPU mode."""
+        with patch('ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler') as mock_handler_class:
+            mock_instance = Mock()
+            mock_instance.is_available.return_value = True
+            mock_handler_class.return_value = mock_instance
+
+            processor = create_ocr_processor_wrapper(use_gpu=False)
+
+            assert isinstance(processor, OCRProcessorWrapper)
+            assert processor.use_gpu is False
