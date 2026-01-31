@@ -228,7 +228,8 @@ def main():
             # Import lazily to avoid pulling in heavy OCR deps on non-OCR workloads.
             from .. import ocr_processor_wrapper
             processor = ocr_processor_wrapper.create_ocr_processor_wrapper(
-                use_gpu=not ocr_args.cpu
+                use_gpu=not ocr_args.cpu,
+                with_images=getattr(args, 'with_images', False)
             )
         else:
             logging.info("No OCR-required formats detected; skipping OCR model load.")

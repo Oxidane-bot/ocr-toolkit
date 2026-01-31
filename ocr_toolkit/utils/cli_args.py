@@ -70,6 +70,11 @@ def add_output_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         help="Disable recursive search in directories (process only top-level files)"
     )
     parser.add_argument(
+        "--with-images",
+        action="store_true",
+        help="Extract and save images with Markdown image links (default: text-only output)"
+    )
+    parser.add_argument(
         "--quiet", "-q",
         action="store_true",
         help="Reduce output verbosity"

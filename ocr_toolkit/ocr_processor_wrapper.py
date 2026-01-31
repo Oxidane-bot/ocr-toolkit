@@ -19,14 +19,16 @@ class OCRProcessorWrapper:
     PaddleOCR-VL-1.5 for document structure analysis.
     """
 
-    def __init__(self, use_gpu: bool = True):
+    def __init__(self, use_gpu: bool = True, with_images: bool = False):
         """
         Initialize the OCR processor wrapper.
 
         Args:
             use_gpu: Whether to use GPU for processing
+            with_images: Whether to extract and save images with links
         """
         self.use_gpu = use_gpu
+        self.with_images = with_images
         self.logger = logging.getLogger(__name__)
 
         # Initialize PaddleOCR-VL handler
@@ -36,7 +38,7 @@ class OCRProcessorWrapper:
         """Initialize the PaddleOCR-VL handler."""
         self.logger.info("Using PaddleOCR-VL-1.5 engine (0.9B VLM for document parsing)")
         from .processors import PaddleOCRVLHandler
-        self.handler = PaddleOCRVLHandler(use_gpu=self.use_gpu)
+        self.handler = PaddleOCRVLHandler(use_gpu=self.use_gpu, with_images=self.with_images)
 
     def process_document(self, file_path: str, args=None) -> dict[str, Any]:
         """
@@ -127,14 +129,15 @@ class OCRProcessorWrapper:
         return self.get_statistics()
 
 
-def create_ocr_processor_wrapper(use_gpu: bool = True) -> OCRProcessorWrapper:
+def create_ocr_processor_wrapper(use_gpu: bool = True, with_images: bool = False) -> OCRProcessorWrapper:
     """
     Create an OCR processor wrapper instance.
 
     Args:
         use_gpu: Whether to use GPU for processing
+        with_images: Whether to extract and save images with links
 
     Returns:
         OCRProcessorWrapper instance
     """
-    return OCRProcessorWrapper(use_gpu=use_gpu)
+    return OCRProcessorWrapper(use_gpu=use_gpu, with_images=with_images)

@@ -46,7 +46,7 @@ class PaddleOCRVLHandler:
     document analysis with vision-language models.
     """
 
-    def __init__(self, use_gpu: bool = True, model_name: str = "PaddleOCR-VL-1.5"):
+    def __init__(self, use_gpu: bool = True, model_name: str = "PaddleOCR-VL-1.5", with_images: bool = False):
         """
         Initialize PaddleOCR-VL-1.5 handler.
 
@@ -54,9 +54,11 @@ class PaddleOCRVLHandler:
             use_gpu: Whether to use GPU for processing (default: True)
             model_name: Model name to use (default: "PaddleOCR-VL-1.5")
                        Options: "PaddleOCR-VL-1.5", "PaddleOCR-VL", or custom path
+            with_images: Whether to extract and save images with links (default: False)
         """
         self.use_gpu = use_gpu
         self.model_name = model_name
+        self.with_images = with_images
         self.logger = logging.getLogger(__name__)
         self.pipeline = None
         self.initialized = False
@@ -346,9 +348,9 @@ class PaddleOCRVLHandler:
                     with open(md_path, 'r', encoding='utf-8') as f:
                         content = f.read()
 
-                    # Copy images to output directory if specified
+                    # Handle images based on with_images setting
                     imgs_dir = os.path.join(temp_dir, 'imgs')
-                    if self._output_dir and os.path.exists(imgs_dir):
+                    if self.with_images and self._output_dir and os.path.exists(imgs_dir):
                         # Create a unique imgs subdirectory for this document
                         # Use a timestamp-based directory name to avoid conflicts
                         import time
@@ -377,6 +379,13 @@ class PaddleOCRVLHandler:
                                 self._image_metadata.append(metadata)
                             else:
                                 self._image_metadata = [metadata]
+                    else:
+                        # Remove image links from markdown (text-only mode)
+                        import re
+                        # Remove markdown image syntax: ![alt](path)
+                        content = re.sub(r'!\[.*?\]\([^)]+\)', '', content)
+                        # Remove inline image references if any
+                        content = re.sub(r'<img[^>]*>', '', content)
 
                     return content
 
