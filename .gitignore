@@ -162,3 +162,4 @@ local_config.py
 test_files/
 .claude/plans/
 .claude/PLAN_*.md
+testFile/
