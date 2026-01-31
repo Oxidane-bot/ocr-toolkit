@@ -47,7 +47,7 @@ class OCRProcessor(FileProcessorBase):
     - Coordinates overall processing workflow
     """
 
-    def __init__(self, batch_size: int = 16, use_gpu: bool = True, use_direct_excel: bool = True):
+    def __init__(self, batch_size: int = 1, use_gpu: bool = True, use_direct_excel: bool = True):
         """
         Initialize OCR processor.
 

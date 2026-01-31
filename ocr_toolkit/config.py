@@ -9,7 +9,7 @@ For PaddleOCR-VL, models are managed internally by the library.
 
 
 # Default processing parameters
-DEFAULT_BATCH_SIZE = 16
+DEFAULT_BATCH_SIZE = 1
 """int: Default batch size for processing pages.
 
 This value determines how many pages are processed simultaneously.

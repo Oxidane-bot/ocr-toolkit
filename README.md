@@ -180,7 +180,7 @@ uv run ocr-extract [OPTIONS] PDF_PATH
 
 Options:
   --output-dir DIR     Output directory
-  --batch_size N       OCR batch size (default: 16)
+  --batch_size N       OCR batch size (default: 1)
   --cpu               Force CPU processing
   --det-arch ARCH     Detection model
   --reco-arch ARCH    Recognition model
@@ -196,7 +196,7 @@ uv run ocr-search [OPTIONS] INPUT_PDF [OUTPUT_PDF]
 
 Options:
   -O LEVEL            Optimization level (0-3)
-  --batch_size N      OCR batch size
+  --batch_size N      OCR batch size (default: 1)
   --cpu              Force CPU processing
 ```
 
@@ -245,7 +245,7 @@ uv run ocr-convert --list-formats
 **OCR out of memory**:
 ```bash
 # Reduce batch size
-uv run ocr-extract --batch_size 8 document.pdf
+uv run ocr-extract --batch_size 1 document.pdf
 
 # Use CPU processing
 uv run ocr-extract --cpu document.pdf

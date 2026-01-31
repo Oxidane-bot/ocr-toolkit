@@ -26,13 +26,17 @@ dependencies = [
     "openpyxl>=3.1.5",
     # PaddlePaddle GPU 3.2.1 (from PaddlePaddle official index)
     "paddlepaddle-gpu==3.2.1; sys_platform == 'win32'",
+    # NVIDIA CUDA/cuDNN runtimes for GPU acceleration (managed by uv)
+    "nvidia-cudnn-cu12>=9.0.0; sys_platform == 'win32'",
+    "nvidia-cublas-cu12>=12.0.0; sys_platform == 'win32'",
+    "nvidia-cuda-runtime-cu12>=12.0.0; sys_platform == 'win32'",
     # PaddleOCR 3.x for OCR processing
     "paddleocr[doc-parser]>=3.0.0",
     "opencv-python",
     "pdf2image",
     "pypdfium2>=4.30.0",
-    # Use NumPy 2.0 to resolve MINGW-W64 Windows build issues
-    "numpy>=2.0.0,<3.0.0",
+    # Use NumPy 1.26.4 to ensure compatibility with PaddleOCR scalar conversions
+    "numpy>=1.26.4,<2.0.0",
     "scikit-image",
     # Core utilities
     "tqdm",

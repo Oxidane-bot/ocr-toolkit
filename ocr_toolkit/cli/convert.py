@@ -11,6 +11,22 @@ import os
 import sys
 import time
 import warnings
+
+# Suppress noisy NumPy warnings on Windows (especially with version 1.26.x)
+# Must be done before importing numpy or other libraries that use it
+warnings.filterwarnings("ignore", message="Numpy built with MINGW-W64 on Windows 64 bits is experimental")
+warnings.filterwarnings("ignore", message="invalid value encountered in exp2")
+warnings.filterwarnings("ignore", message="invalid value encountered in log10")
+warnings.filterwarnings("ignore", message="invalid value encountered in nextafter")
+
+# Suppress PaddlePaddle/PaddleOCR noisy output
+os.environ['PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK'] = 'True'  # Disable model source check
+os.environ['GLOG_MINLOGLEVEL'] = '3'  # Only show FATAL errors from Google Logging
+os.environ['GLOG_V'] = '0'  # Set verbosity to 0
+os.environ['FLAGS_logtostderr'] = '0'  # Don't log to stderr
+warnings.filterwarnings("ignore", message="Non compatible API")  # Suppress PaddlePaddle API warnings
+warnings.filterwarnings("ignore", message="To copy construct from a tensor")
+
 from argparse import Namespace
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -190,7 +206,7 @@ def main():
 
         # Prepare OCR arguments, using passed args or falling back to defaults
         ocr_args = Namespace(
-            batch_size=args.batch_size,
+            batch_size=1,  # Default batch size for compatibility
             cpu=args.cpu,
             engine=getattr(args, 'engine', 'paddleocr')
         )
@@ -264,13 +280,11 @@ def main():
             relative_path = file_relative_paths.get(file_path, os.path.basename(file_path))
 
             try:
-                # Enhanced logging for preserve structure mode
+                # Enhanced logging for preserve structure mode - use print to avoid being drowned by PaddlePaddle stderr
                 if args.preserve_structure:
-                    logging.info(
-                        f"Processing [{processed_count}/{len(files_to_process)}]: {file_path} -> {relative_path}"
-                    )
+                    print(f"Processing [{processed_count}/{len(files_to_process)}]: {file_path} -> {relative_path}")
                 else:
-                    logging.info(f"Processing [{processed_count}/{len(files_to_process)}]: {file_path}")
+                    print(f"Processing [{processed_count}/{len(files_to_process)}]: {file_path}")
 
                 ext = Path(file_path).suffix.lower()
 

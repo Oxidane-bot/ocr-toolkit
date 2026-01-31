@@ -9,7 +9,66 @@ This module provides verification and device information utilities.
 """
 
 import logging
+import os
+import sys
 from typing import Any
+
+
+def setup_nvidia_dll_paths():
+    """
+    On Windows, NVIDIA runtime libraries (cuDNN, cuBLAS, etc.) installed via pip
+    need to be explicitly added to the DLL search path to prevent crashes
+    when importing paddle or other CUDA-linked libraries.
+    """
+    if sys.platform != 'win32':
+        return
+
+    logger = logging.getLogger(__name__)
+    nvidia_packages = ['nvidia.cudnn', 'nvidia.cublas', 'nvidia.cuda_runtime', 'nvidia.curand']
+
+    for pkg in nvidia_packages:
+        try:
+            # We use importlib to find the package path without potentially
+            # triggering the crash that a full import might cause if it's already linked.
+            import importlib.util
+            spec = importlib.util.find_spec(pkg)
+            if spec and spec.submodule_search_locations:
+                package_path = spec.submodule_search_locations[0]
+                bin_path = os.path.join(package_path, 'bin')
+
+                if os.path.exists(bin_path):
+                    logger.debug(f"Adding NVIDIA DLL directory: {bin_path}")
+                    # Add to PATH for older Python versions and general compatibility
+                    os.environ['PATH'] = bin_path + os.pathsep + os.environ.get('PATH', '')
+                    # Use add_dll_directory for Python 3.8+ (Windows)
+                    if hasattr(os, 'add_dll_directory'):
+                        try:
+                            os.add_dll_directory(bin_path)
+                        except Exception as e:
+                            logger.warning(f"Failed to add DLL directory {bin_path}: {e}")
+        except Exception as e:
+            # Silently skip if package not found or other issues
+            logger.debug(f"Could not find spec for {pkg}: {e}")
+
+    # Additional fallback: search site-packages directly if find_spec failed
+    try:
+        import site
+        site_packages = site.getsitepackages()
+        for site_pkg in site_packages:
+            nvidia_base = os.path.join(site_pkg, 'nvidia')
+            if os.path.exists(nvidia_base):
+                for nvidia_pkg in os.listdir(nvidia_base):
+                    pkg_bin_path = os.path.join(nvidia_base, nvidia_pkg, 'bin')
+                    if os.path.exists(pkg_bin_path):
+                        logger.debug(f"Adding NVIDIA DLL directory (fallback): {pkg_bin_path}")
+                        os.environ['PATH'] = pkg_bin_path + os.pathsep + os.environ.get('PATH', '')
+                        if hasattr(os, 'add_dll_directory'):
+                            try:
+                                os.add_dll_directory(pkg_bin_path)
+                            except Exception as e:
+                                logger.debug(f"Failed to add DLL directory {pkg_bin_path}: {e}")
+    except Exception as e:
+        logger.debug(f"Could not search site-packages for NVIDIA DLLs: {e}")
 
 
 def load_ocr_model(use_cpu: bool = False):
@@ -32,6 +91,9 @@ def load_ocr_model(use_cpu: bool = False):
         >>> load_ocr_model()  # Just verify installation
         >>> # PaddleOCR 3.x will handle model loading
     """
+    # Setup NVIDIA DLL paths on Windows before importing paddle
+    setup_nvidia_dll_paths()
+
     try:
         import paddle
 
@@ -98,6 +160,9 @@ def get_device_info() -> dict[str, Any]:
         'cuda_device_count': 0,
         'cuda_device_name': None,
     }
+
+    # Setup NVIDIA DLL paths on Windows before importing paddle
+    setup_nvidia_dll_paths()
 
     try:
         import paddle

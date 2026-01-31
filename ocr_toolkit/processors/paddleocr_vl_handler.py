@@ -14,11 +14,28 @@ for robust document parsing with support for:
 
 import logging
 import os
+import sys
 import tempfile
 import shutil
 from pathlib import Path
+from contextlib import redirect_stderr
+from io import StringIO
+
+# IMPORTANT: Set environment variables and logging levels BEFORE any PaddlePaddle imports
+# to suppress noisy output during initialization
+os.environ['PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK'] = 'True'
+os.environ['PADDLE_SDK_CHECK_CONNECTIVITY'] = 'False'
+os.environ['GLOG_MINLOGLEVEL'] = '3'  # Only show FATAL errors
+os.environ['GLOG_V'] = '0'  # Set verbosity to 0
+os.environ['FLAGS_logtostderr'] = '0'  # Don't log to stderr
 
 from ..utils.profiling import Profiler
+from ..utils.model_loader import setup_nvidia_dll_paths
+
+# Suppress PaddleX and PaddlePaddle logging (after utils import to avoid circular dependency)
+logging.getLogger('paddlex').setLevel(logging.ERROR)
+logging.getLogger('paddle').setLevel(logging.ERROR)
+logging.getLogger('Paddle').setLevel(logging.ERROR)
 
 
 class PaddleOCRVLHandler:
@@ -44,9 +61,6 @@ class PaddleOCRVLHandler:
         self.pipeline = None
         self.initialized = False
 
-        # Disable model source check warnings
-        os.environ['PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK'] = 'True'
-
         # Initialize pipeline
         self._initialize()
 
@@ -60,11 +74,34 @@ class PaddleOCRVLHandler:
         try:
             self.logger.info(f"Initializing PaddleOCR-VL with model: {self.model_name}")
 
-            # Import PaddleOCR
-            from paddleocr import PaddleOCRVL
+            # Special handling for Windows to find NVIDIA DLLs from pip packages
+            setup_nvidia_dll_paths()
 
-            # Initialize the pipeline
-            self.pipeline = PaddleOCRVL()
+            # Suppress noisy PaddleX output by redirecting stderr during initialization
+            from contextlib import redirect_stderr
+            from io import StringIO
+
+            stderr_capture = StringIO()
+            with redirect_stderr(stderr_capture):
+                # Import PaddleOCR
+                from paddleocr import PaddleOCRVL
+                import paddle
+
+                # Set device based on use_gpu parameter
+                if self.use_gpu:
+                    try:
+                        paddle.set_device('gpu')
+                        self.logger.info("Using GPU for PaddleOCR-VL")
+                    except Exception as e:
+                        self.logger.warning(f"Failed to set GPU device: {e}. Falling back to CPU.")
+                        paddle.set_device('cpu')
+                        self.use_gpu = False
+                else:
+                    paddle.set_device('cpu')
+                    self.logger.info("Using CPU for PaddleOCR-VL")
+
+                # Initialize the pipeline with device configuration
+                self.pipeline = PaddleOCRVL()
 
             self.initialized = True
             self.logger.info("PaddleOCR-VL initialized successfully")

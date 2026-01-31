@@ -58,6 +58,15 @@ def create_parser():
     return parser
 
 
+import warnings
+
+# Suppress noisy NumPy warnings on Windows (especially with version 1.26.x)
+warnings.filterwarnings("ignore", message="Numpy built with MINGW-W64 on Windows 64 bits is experimental")
+warnings.filterwarnings("ignore", message="invalid value encountered in exp2")
+warnings.filterwarnings("ignore", message="invalid value encountered in log10")
+warnings.filterwarnings("ignore", message="invalid value encountered in nextafter")
+
+
 def main():
     """Main entry point for ocr-bench command."""
     setup_logging()

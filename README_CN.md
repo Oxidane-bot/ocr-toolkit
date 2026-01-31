@@ -180,7 +180,7 @@ uv run ocr-extract [选项] PDF路径
 
 选项:
   --output-dir DIR     输出目录
-  --batch_size N       OCR批处理大小 (默认: 16)
+  --batch_size N       OCR批处理大小 (默认: 1)
   --cpu               强制CPU处理
   --det-arch ARCH     检测模型
   --reco-arch ARCH    识别模型
@@ -244,7 +244,7 @@ uv run ocr-convert --list-formats
 **OCR内存不足**:
 ```bash
 # 减少批处理大小
-uv run ocr-extract --batch_size 8 document.pdf
+uv run ocr-extract --batch_size 1 document.pdf
 
 # 使用CPU处理
 uv run ocr-extract --cpu document.pdf
