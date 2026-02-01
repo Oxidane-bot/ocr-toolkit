@@ -19,12 +19,8 @@ warnings.filterwarnings("ignore", message="invalid value encountered in exp2")
 warnings.filterwarnings("ignore", message="invalid value encountered in log10")
 warnings.filterwarnings("ignore", message="invalid value encountered in nextafter")
 
-# Suppress PaddlePaddle/PaddleOCR noisy output
-os.environ['PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK'] = 'True'  # Disable model source check
-os.environ['GLOG_MINLOGLEVEL'] = '3'  # Only show FATAL errors from Google Logging
-os.environ['GLOG_V'] = '0'  # Set verbosity to 0
-os.environ['FLAGS_logtostderr'] = '0'  # Don't log to stderr
-warnings.filterwarnings("ignore", message="Non compatible API")  # Suppress PaddlePaddle API warnings
+# Suppress PaddlePaddle/PaddleOCR API warnings
+warnings.filterwarnings("ignore", message="Non compatible API")
 warnings.filterwarnings("ignore", message="To copy construct from a tensor")
 
 from argparse import Namespace
@@ -40,6 +36,7 @@ from ..utils import (
     add_output_args,
     check_input_path_exists,
     configure_logging_level,
+    configure_paddle_environment,
     discover_files,
     generate_file_tree,
     get_directory_cache,
@@ -54,6 +51,25 @@ def _apply_threads_env(threads: int | None) -> None:
     if threads and threads > 0:
         os.environ["OMP_NUM_THREADS"] = str(threads)
         os.environ["MKL_NUM_THREADS"] = str(threads)
+
+
+def _determine_output_directory(args, base_dir: str) -> str:
+    """
+    Determine the output directory based on arguments.
+
+    Args:
+        args: Command line arguments
+        base_dir: Base input directory
+
+    Returns:
+        Output directory path
+    """
+    if args.preserve_structure:
+        if args.output_dir:
+            return args.output_dir
+        return os.path.join(base_dir, config.DEFAULT_MARKDOWN_OUTPUT_DIR)
+    else:
+        return args.output_dir or os.path.join(base_dir, config.DEFAULT_MARKDOWN_OUTPUT_DIR)
 
 
 def create_parser():
@@ -157,6 +173,9 @@ def validate_arguments(args):
 
 def main():
     """Main entry point for ocr-convert command."""
+    # Configure PaddlePaddle environment before any imports
+    configure_paddle_environment()
+
     # Suppress verbose warnings from the pypdf library
     warnings.filterwarnings("ignore", message="Cannot set non-stroke color because 2 components are specified but only 1 (grayscale), 3 (rgb) and 4 (cmyk) are supported", module="pypdf")
     warnings.filterwarnings("ignore", message="Could get FontBBox from font descriptor because None cannot be parsed as 4 floats", module="pypdf")
@@ -241,11 +260,7 @@ def main():
         # Display output directory structure preview for preserve structure mode
         if args.preserve_structure and len(files_to_process) > 1:
             # Determine output directory for preview - must match get_output_file_path logic
-            if args.output_dir:
-                output_directory = args.output_dir
-            else:
-                # For preserve structure mode, use input base directory
-                output_directory = os.path.join(base_dir, config.DEFAULT_MARKDOWN_OUTPUT_DIR)
+            output_directory = _determine_output_directory(args, base_dir)
 
             logging.info("Directory structure preview:")
             logging.info(f"  Input base: {base_dir}")
@@ -515,14 +530,9 @@ def main():
         # Determine output directory for display - must match get_output_file_path logic
         if args.preserve_structure:
             structure_note = " (preserving directory structure)"
-            if args.output_dir:
-                output_directory = args.output_dir
-            else:
-                # For preserve structure mode, use input base directory
-                output_directory = os.path.join(base_dir, config.DEFAULT_MARKDOWN_OUTPUT_DIR)
         else:
             structure_note = " (flat structure)"
-            output_directory = args.output_dir if args.output_dir else os.path.join(base_dir, config.DEFAULT_MARKDOWN_OUTPUT_DIR)
+        output_directory = _determine_output_directory(args, base_dir)
         print(f"Output directory: {output_directory}{structure_note}")
 
         # Display structure preservation summary for preserve structure mode
