@@ -2,16 +2,15 @@
 Unit tests for CLI commands.
 """
 
-import pytest
 import os
-import sys
-import subprocess
-import tempfile
 import shutil
-from unittest.mock import Mock, patch, MagicMock
+import sys
+import tempfile
+
+import pytest
 
 # Add project root to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from ocr_toolkit.cli import convert
 
@@ -27,6 +26,7 @@ class TestCLICommands:
         """Cleanup after each test method."""
         # Use pathlib instead of os.path.exists to avoid PaddleOCR os module override
         import pathlib
+
         test_dir_path = pathlib.Path(self.test_dir)
         if test_dir_path.exists():
             shutil.rmtree(self.test_dir, ignore_errors=True)
@@ -35,24 +35,27 @@ class TestCLICommands:
         """Test convert command parser creation."""
         parser = convert.create_parser()
         assert parser is not None
-        assert parser.prog == 'ocr-convert'
+        assert parser.prog == "ocr-convert"
 
     def test_convert_validate_arguments_list_formats(self):
         """Test convert argument validation for list-formats."""
         from argparse import Namespace
+
         args = Namespace(list_formats=True, workers=4)
         assert convert.validate_arguments(args) is True
 
     def test_convert_validate_arguments_no_input(self):
         """Test convert argument validation without input path."""
         from argparse import Namespace
+
         args = Namespace(list_formats=False, input_path=None, workers=4)
         assert convert.validate_arguments(args) is False
 
     def test_convert_validate_arguments_invalid_workers(self):
         """Test convert argument validation with invalid workers."""
         from argparse import Namespace
-        args = Namespace(list_formats=False, input_path='/test', workers=0)
+
+        args = Namespace(list_formats=False, input_path="/test", workers=0)
         assert convert.validate_arguments(args) is False
 
     def test_convert_list_supported_formats(self):
@@ -65,12 +68,11 @@ class TestCLICommands:
 
     def test_convert_help_functionality(self):
         """Test that convert command can show help without errors."""
-        from argparse import ArgumentParser
 
         # Create parser and test help doesn't raise exceptions
         parser = convert.create_parser()
         try:
-            parser.parse_args(['--help'])
+            parser.parse_args(["--help"])
         except SystemExit as e:
             # argparse exits with code 0 for help
             assert e.code == 0

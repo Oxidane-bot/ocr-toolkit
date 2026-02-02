@@ -17,13 +17,10 @@ def setup_logging() -> None:
     Sets up a standard logging configuration with timestamp, level, and message
     formatting that is consistent across all CLI commands.
     """
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def setup_logging_with_file(log_file_path: str, encoding: str = 'utf-8') -> None:
+def setup_logging_with_file(log_file_path: str, encoding: str = "utf-8") -> None:
     """
     Configure logging with both console and file output.
 
@@ -34,10 +31,7 @@ def setup_logging_with_file(log_file_path: str, encoding: str = 'utf-8') -> None
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.FileHandler(log_file_path, encoding=encoding),
-            logging.StreamHandler()
-        ]
+        handlers=[logging.FileHandler(log_file_path, encoding=encoding), logging.StreamHandler()],
     )
 
 
@@ -50,7 +44,9 @@ class BaseArgumentParser:
     """
 
     @staticmethod
-    def create_base_parser(prog: str, description: str, epilog: str | None = None) -> argparse.ArgumentParser:
+    def create_base_parser(
+        prog: str, description: str, epilog: str | None = None
+    ) -> argparse.ArgumentParser:
         """
         Create a base argument parser with standard configuration.
 
@@ -66,12 +62,15 @@ class BaseArgumentParser:
             prog=prog,
             description=description,
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            epilog=epilog
+            epilog=epilog,
         )
 
     @staticmethod
-    def add_input_path_argument(parser: argparse.ArgumentParser, required: bool = True,
-                               help: str = "Path to document file or directory") -> None:
+    def add_input_path_argument(
+        parser: argparse.ArgumentParser,
+        required: bool = True,
+        help: str = "Path to document file or directory",
+    ) -> None:
         """
         Add input path argument to parser.
 
@@ -83,7 +82,7 @@ class BaseArgumentParser:
         if required:
             parser.add_argument("input_path", help=help)
         else:
-            parser.add_argument("input_path", nargs='?', help=help)
+            parser.add_argument("input_path", nargs="?", help=help)
 
     @staticmethod
     def add_workers_argument(parser: argparse.ArgumentParser, default: int = 4) -> None:
@@ -98,7 +97,7 @@ class BaseArgumentParser:
             "--workers",
             type=int,
             default=default,
-            help=f"Number of concurrent workers for batch processing (default: {default})"
+            help=f"Number of concurrent workers for batch processing (default: {default})",
         )
 
     @staticmethod
@@ -109,15 +108,9 @@ class BaseArgumentParser:
         Args:
             parser: ArgumentParser to add arguments to
         """
+        parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
         parser.add_argument(
-            "--verbose", "-v",
-            action="store_true",
-            help="Enable verbose output"
-        )
-        parser.add_argument(
-            "--quiet", "-q",
-            action="store_true",
-            help="Suppress non-essential output"
+            "--quiet", "-q", action="store_true", help="Suppress non-essential output"
         )
 
 
@@ -132,12 +125,12 @@ def validate_common_arguments(args: argparse.Namespace) -> bool:
         True if arguments are valid, False otherwise
     """
     # Check verbose and quiet are not both set
-    if hasattr(args, 'verbose') and hasattr(args, 'quiet') and args.verbose and args.quiet:
+    if hasattr(args, "verbose") and hasattr(args, "quiet") and args.verbose and args.quiet:
         print("Error: --verbose and --quiet cannot be used together")
         return False
 
     # Check workers value if present
-    if hasattr(args, 'workers') and args.workers is not None:
+    if hasattr(args, "workers") and args.workers is not None:
         if args.workers < 1:
             print("Error: --workers must be at least 1")
             return False
@@ -154,9 +147,9 @@ def configure_logging_level(args: argparse.Namespace) -> None:
     Args:
         args: Parsed arguments with potential verbose/quiet flags
     """
-    if hasattr(args, 'quiet') and args.quiet:
+    if hasattr(args, "quiet") and args.quiet:
         logging.getLogger().setLevel(logging.WARNING)
-    elif hasattr(args, 'verbose') and args.verbose:
+    elif hasattr(args, "verbose") and args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
     else:
         logging.getLogger().setLevel(logging.INFO)
@@ -174,7 +167,7 @@ def check_input_path_exists(args: argparse.Namespace) -> bool:
     """
     import os
 
-    if not hasattr(args, 'input_path') or not args.input_path:
+    if not hasattr(args, "input_path") or not args.input_path:
         return True  # Skip check if no input_path
 
     if not os.path.exists(args.input_path):
@@ -184,8 +177,13 @@ def check_input_path_exists(args: argparse.Namespace) -> bool:
     return True
 
 
-def print_processing_summary(total_files: int, successful: int, failed: int,
-                           total_time: float, extra_stats: dict[str, Any] | None = None) -> None:
+def print_processing_summary(
+    total_files: int,
+    successful: int,
+    failed: int,
+    total_time: float,
+    extra_stats: dict[str, Any] | None = None,
+) -> None:
     """
     Print a standardized processing summary.
 
@@ -198,9 +196,9 @@ def print_processing_summary(total_files: int, successful: int, failed: int,
     """
     success_rate = (successful / total_files * 100) if total_files > 0 else 0
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("PROCESSING SUMMARY")
-    print("="*60)
+    print("=" * 60)
     print(f"Total files processed: {total_files}")
     print(f"Successful: {successful}")
     print(f"Failed: {failed}")

@@ -12,9 +12,9 @@ from .powerpoint_com import PowerPointComStrategy
 from .word_com import WordComStrategy
 
 __all__ = [
-    'ConversionStrategy',
-    'DocxToPdfStrategy',
-    'WordComStrategy',
-    'PowerPointComStrategy',
-    'ExcelComStrategy',
+    "ConversionStrategy",
+    "DocxToPdfStrategy",
+    "WordComStrategy",
+    "PowerPointComStrategy",
+    "ExcelComStrategy",
 ]

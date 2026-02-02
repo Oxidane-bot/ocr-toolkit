@@ -45,7 +45,7 @@ class OfficeConverter:
             DocxToPdfStrategy(),
             WordComStrategy(),
             PowerPointComStrategy(),
-            ExcelComStrategy()
+            ExcelComStrategy(),
         ]
         self.logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ class OfficeConverter:
         ext = Path(input_path).suffix.lower()
 
         # For .docx files, try docx2pdf first, then fall back to COM
-        if ext == '.docx':
+        if ext == ".docx":
             return self._convert_docx_with_fallback(input_path, output_path)
 
         # For other formats, find the appropriate strategy
@@ -77,10 +77,10 @@ class OfficeConverter:
 
         # No strategy found
         return {
-            'method': 'unsupported',
-            'success': False,
-            'processing_time': 0,
-            'error': f'Unsupported file format: {ext}'
+            "method": "unsupported",
+            "success": False,
+            "processing_time": 0,
+            "error": f"Unsupported file format: {ext}",
         }
 
     def _convert_docx_with_fallback(self, input_path: str, output_path: str) -> dict[str, Any]:
@@ -100,7 +100,7 @@ class OfficeConverter:
         docx_strategy = next(s for s in self.strategies if isinstance(s, DocxToPdfStrategy))
         result = docx_strategy.convert(input_path, output_path)
 
-        if not result['success']:
+        if not result["success"]:
             self.logger.warning("docx2pdf failed, trying Word COM automation")
             word_strategy = next(s for s in self.strategies if isinstance(s, WordComStrategy))
             result = word_strategy.convert(input_path, output_path)
@@ -119,13 +119,13 @@ class OfficeConverter:
         """
         try:
             # Create temporary PDF file
-            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as temp_pdf:
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as temp_pdf:
                 temp_pdf_path = temp_pdf.name
 
             # Convert to PDF
             result = self.convert_to_pdf(input_path, temp_pdf_path)
 
-            if result['success']:
+            if result["success"]:
                 self.logger.info(f"Created temporary PDF: {temp_pdf_path}")
                 return temp_pdf_path
             else:
@@ -152,13 +152,13 @@ class OfficeConverter:
         formats = set()
         for strategy in self.strategies:
             if isinstance(strategy, DocxToPdfStrategy):
-                formats.add('.docx')
+                formats.add(".docx")
             elif isinstance(strategy, WordComStrategy):
-                formats.update(['.doc', '.docx'])
+                formats.update([".doc", ".docx"])
             elif isinstance(strategy, PowerPointComStrategy):
-                formats.update(['.ppt', '.pptx'])
+                formats.update([".ppt", ".pptx"])
             elif isinstance(strategy, ExcelComStrategy):
-                formats.update(['.xls', '.xlsx'])
+                formats.update([".xls", ".xlsx"])
 
         return sorted(formats)
 

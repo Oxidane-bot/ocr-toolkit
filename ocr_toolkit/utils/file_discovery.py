@@ -50,7 +50,9 @@ def get_directory_cache() -> DirectoryCache:
     return _directory_cache
 
 
-def _safe_recursive_search(base_path: Path, supported_extensions: set[str], max_depth: int) -> tuple[list[str], dict[str, str]]:
+def _safe_recursive_search(
+    base_path: Path, supported_extensions: set[str], max_depth: int
+) -> tuple[list[str], dict[str, str]]:
     """
     Safely search for files recursively with depth limit and symlink protection.
 
@@ -101,7 +103,7 @@ def _safe_recursive_search(base_path: Path, supported_extensions: set[str], max_
                             files.append(file_path)
                             # Calculate relative path from base directory
                             rel_path = item.relative_to(base_path)
-                            file_relative_paths[file_path] = str(rel_path).replace('\\', '/')
+                            file_relative_paths[file_path] = str(rel_path).replace("\\", "/")
                     elif item.is_dir() and not item.is_symlink():
                         # Recursively search subdirectories (skip symlinks for safety)
                         # Skip default output directory to avoid re-processing generated files on
@@ -145,7 +147,9 @@ def is_supported_file(file_path: str) -> bool:
     return ext in get_supported_extensions()
 
 
-def discover_files(input_path: str, recursive: bool = True, max_depth: int = 50) -> tuple[list[str], str, dict[str, str]]:
+def discover_files(
+    input_path: str, recursive: bool = True, max_depth: int = 50
+) -> tuple[list[str], str, dict[str, str]]:
     """
     Discover supported files from a given path (file or directory).
 
@@ -179,7 +183,9 @@ def discover_files(input_path: str, recursive: bool = True, max_depth: int = 50)
 
     if input_path_obj.is_dir():
         search_type = "recursively" if recursive else "non-recursively"
-        logging.info(f"Input is a directory. Searching {search_type} for supported files in: {input_path}")
+        logging.info(
+            f"Input is a directory. Searching {search_type} for supported files in: {input_path}"
+        )
         base_dir = str(input_path_obj)
 
         if recursive:
@@ -221,16 +227,20 @@ def discover_files(input_path: str, recursive: bool = True, max_depth: int = 50)
     # Validate relative paths for safety and reliability
     for file_path, rel_path in file_relative_paths.items():
         # Check for potentially unsafe relative paths
-        if '..' in rel_path or os.path.isabs(rel_path):
-            logging.warning(f"Potentially unsafe relative path detected: {rel_path} for file {file_path}")
+        if ".." in rel_path or os.path.isabs(rel_path):
+            logging.warning(
+                f"Potentially unsafe relative path detected: {rel_path} for file {file_path}"
+            )
 
         # Check for excessively long paths (Windows has 260 char limit)
         if len(rel_path) > config.MAX_RELATIVE_PATH_LENGTH:
             logging.warning(f"Relative path may be too long ({len(rel_path)} chars): {rel_path}")
 
         # Check for empty or problematic relative paths
-        if not rel_path or rel_path in ['.', '..']:
-            logging.warning(f"Empty or problematic relative path: '{rel_path}' for file {file_path}")
+        if not rel_path or rel_path in [".", ".."]:
+            logging.warning(
+                f"Empty or problematic relative path: '{rel_path}' for file {file_path}"
+            )
 
     return files, base_dir, file_relative_paths
 
@@ -267,15 +277,17 @@ def discover_pdf_files(input_path: str) -> tuple[list[str], str]:
             file_path = os.path.join(input_path, filename)
             if os.path.isfile(file_path):
                 ext = os.path.splitext(filename)[1].lower()
-                if ext == '.pdf':
+                if ext == ".pdf":
                     files.append(file_path)
 
         logging.info(f"Found {len(files)} PDF files")
 
     elif os.path.isfile(input_path):
         ext = os.path.splitext(input_path)[1].lower()
-        if ext != '.pdf':
-            raise ValueError(f"Input file format '{ext}' is not supported. Only PDF files are supported.")
+        if ext != ".pdf":
+            raise ValueError(
+                f"Input file format '{ext}' is not supported. Only PDF files are supported."
+            )
         base_dir = os.path.dirname(input_path)
         files.append(input_path)
     else:
@@ -287,7 +299,13 @@ def discover_pdf_files(input_path: str) -> tuple[list[str], str]:
     return files, base_dir
 
 
-def get_output_file_path(input_path: str, output_dir: str | None = None, preserve_structure: bool = False, relative_path: str | None = None, base_dir: str | None = None) -> str:
+def get_output_file_path(
+    input_path: str,
+    output_dir: str | None = None,
+    preserve_structure: bool = False,
+    relative_path: str | None = None,
+    base_dir: str | None = None,
+) -> str:
     """
     Determine the output file path for a converted Markdown document.
 
@@ -308,7 +326,7 @@ def get_output_file_path(input_path: str, output_dir: str | None = None, preserv
     """
     # Use pathlib for better path handling
     input_path_obj = Path(input_path)
-    output_filename = input_path_obj.stem + '.md'
+    output_filename = input_path_obj.stem + ".md"
 
     if output_dir:
         output_dir_obj = Path(output_dir)
@@ -316,7 +334,7 @@ def get_output_file_path(input_path: str, output_dir: str | None = None, preserv
             # Preserve directory structure: use relative path to create subdirectories
             rel_path_obj = Path(relative_path)
             rel_dir = rel_path_obj.parent
-            if rel_dir != Path('.'):
+            if rel_dir != Path("."):
                 output_path = output_dir_obj / rel_dir / output_filename
             else:
                 output_path = output_dir_obj / output_filename
@@ -332,7 +350,7 @@ def get_output_file_path(input_path: str, output_dir: str | None = None, preserv
         default_output_dir = base_dir_obj / config.DEFAULT_MARKDOWN_OUTPUT_DIR
         rel_path_obj = Path(relative_path)
         rel_dir = rel_path_obj.parent
-        if rel_dir != Path('.'):
+        if rel_dir != Path("."):
             output_path = default_output_dir / rel_dir / output_filename
         else:
             output_path = default_output_dir / output_filename

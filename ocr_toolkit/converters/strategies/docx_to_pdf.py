@@ -29,25 +29,26 @@ class DocxToPdfStrategy(ConversionStrategy):
             Dictionary with conversion results
         """
         result = {
-            'method': self.get_method_name(),
-            'success': False,
-            'processing_time': 0,
-            'error': ''
+            "method": self.get_method_name(),
+            "success": False,
+            "processing_time": 0,
+            "error": "",
         }
 
         start_time = time.time()
 
         try:
             from docx2pdf import convert
+
             convert(input_path, output_path)
-            result['success'] = True
+            result["success"] = True
             logging.info(f"Successfully converted {input_path} to PDF using docx2pdf")
 
         except Exception as e:
-            result['error'] = str(e)
+            result["error"] = str(e)
             logging.error(f"docx2pdf conversion failed for {input_path}: {e}")
 
-        result['processing_time'] = time.time() - start_time
+        result["processing_time"] = time.time() - start_time
         return result
 
     def supports_format(self, file_extension: str) -> bool:
@@ -60,8 +61,8 @@ class DocxToPdfStrategy(ConversionStrategy):
         Returns:
             True for .docx files only
         """
-        return file_extension.lower() == '.docx'
+        return file_extension.lower() == ".docx"
 
     def get_method_name(self) -> str:
         """Get the name of this conversion method."""
-        return 'docx2pdf'
+        return "docx2pdf"

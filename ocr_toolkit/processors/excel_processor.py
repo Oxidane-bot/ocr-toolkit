@@ -24,7 +24,7 @@ class ExcelDataProcessor(FileProcessorBase):
     - Proper handling of formulas, dates, and cell values
     """
 
-    SUPPORTED_FORMATS = {'.xlsx', '.xls'}
+    SUPPORTED_FORMATS = {".xlsx", ".xls"}
 
     def __init__(self):
         """Initialize Excel data processor."""
@@ -43,8 +43,8 @@ class ExcelDataProcessor(FileProcessorBase):
             True if format is supported, False otherwise
         """
         ext = file_extension.lower()
-        if not ext.startswith('.'):
-            ext = '.' + ext
+        if not ext.startswith("."):
+            ext = "." + ext
         return ext in cls.SUPPORTED_FORMATS
 
     def get_supported_formats(self) -> list[str]:
@@ -68,10 +68,10 @@ class ExcelDataProcessor(FileProcessorBase):
             ProcessingResult object with processing results
         """
         start_time = time.time()
-        result = self._create_result(file_path, 'excel_data', start_time)
+        result = self._create_result(file_path, "excel_data", start_time)
 
         if not self._validate_file(file_path):
-            result.error = f'Invalid file: {file_path}'
+            result.error = f"Invalid file: {file_path}"
             result.processing_time = time.time() - start_time
             return result
 
@@ -79,7 +79,7 @@ class ExcelDataProcessor(FileProcessorBase):
             ext = Path(file_path).suffix.lower()
 
             if not self.supports_format(ext):
-                result.error = f'Unsupported file format for Excel processing: {ext}'
+                result.error = f"Unsupported file format for Excel processing: {ext}"
                 result.processing_time = time.time() - start_time
                 return result
 
@@ -87,7 +87,9 @@ class ExcelDataProcessor(FileProcessorBase):
             try:
                 import openpyxl
             except ImportError as e:
-                result.error = 'openpyxl library not installed. Please install it to process Excel files.'
+                result.error = (
+                    "openpyxl library not installed. Please install it to process Excel files."
+                )
                 self.logger.error(f"openpyxl import failed: {e}")
                 result.processing_time = time.time() - start_time
                 return result
@@ -127,9 +129,9 @@ class ExcelDataProcessor(FileProcessorBase):
             wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
         except Exception as e:
             error_msg = str(e).lower()
-            if 'password' in error_msg or 'encrypted' in error_msg:
+            if "password" in error_msg or "encrypted" in error_msg:
                 raise ValueError(f"Cannot process password-protected Excel file: {file_path}")
-            elif 'invalid' in error_msg or 'corrupt' in error_msg:
+            elif "invalid" in error_msg or "corrupt" in error_msg:
                 raise ValueError(f"Excel file appears to be corrupted: {file_path}")
             else:
                 raise ValueError(f"Failed to open Excel file: {e}")
@@ -145,7 +147,9 @@ class ExcelDataProcessor(FileProcessorBase):
                     markdown_parts.append(sheet_md)
                 except Exception as e:
                     self.logger.warning(f"Failed to process sheet '{sheet_name}': {e}")
-                    markdown_parts.append(f"\n## Sheet: {sheet_name}\n\n*(Error processing this sheet: {e})*\n")
+                    markdown_parts.append(
+                        f"\n## Sheet: {sheet_name}\n\n*(Error processing this sheet: {e})*\n"
+                    )
 
         finally:
             wb.close()
@@ -188,14 +192,14 @@ class ExcelDataProcessor(FileProcessorBase):
         # Build Markdown table
         for i, row in enumerate(rows):
             # Pad row to max columns
-            padded_row = row + [''] * (max_cols - len(row))
+            padded_row = row + [""] * (max_cols - len(row))
 
             # Create table row
-            markdown_lines.append('| ' + ' | '.join(padded_row) + ' |')
+            markdown_lines.append("| " + " | ".join(padded_row) + " |")
 
             # Add header separator after first row
             if i == 0:
-                markdown_lines.append('| ' + ' | '.join(['---'] * max_cols) + ' |')
+                markdown_lines.append("| " + " | ".join(["---"] * max_cols) + " |")
 
         return "\n".join(markdown_lines)
 
@@ -211,11 +215,11 @@ class ExcelDataProcessor(FileProcessorBase):
         """
         # Handle None/empty cells
         if cell_value is None:
-            return ''
+            return ""
 
         # Handle datetime objects
         if isinstance(cell_value, datetime):
-            return cell_value.strftime('%Y-%m-%d %H:%M:%S')
+            return cell_value.strftime("%Y-%m-%d %H:%M:%S")
 
         # Handle numbers - format with reasonable precision
         if isinstance(cell_value, (int, float)):
@@ -229,10 +233,10 @@ class ExcelDataProcessor(FileProcessorBase):
         cell_str = str(cell_value)
 
         # Escape pipe characters in Markdown tables
-        cell_str = cell_str.replace('|', '\\|')
+        cell_str = cell_str.replace("|", "\\|")
 
         # Truncate very long cell values to prevent unwieldy tables
         if len(cell_str) > 100:
-            cell_str = cell_str[:97] + '...'
+            cell_str = cell_str[:97] + "..."
 
         return cell_str

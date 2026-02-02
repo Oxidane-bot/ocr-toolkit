@@ -38,6 +38,7 @@ class OCRProcessorWrapper:
         """Initialize the PaddleOCR-VL handler."""
         self.logger.info("Using PaddleOCR-VL-1.5 engine (0.9B VLM for document parsing)")
         from .processors import PaddleOCRVLHandler
+
         self.handler = PaddleOCRVLHandler(use_gpu=self.use_gpu, with_images=self.with_images)
 
     def process_document(self, file_path: str, args=None) -> dict[str, Any]:
@@ -55,17 +56,18 @@ class OCRProcessorWrapper:
 
         try:
             # Get processing parameters
-            pages = getattr(args, 'pages', None) if args else None
-            profile = getattr(args, 'profile', False) if args else False
+            pages = getattr(args, "pages", None) if args else None
+            profile = getattr(args, "profile", False) if args else False
 
             # Use PaddleOCR-VL handler
             profiler = None
             if profile:
                 from .utils.profiling import Profiler
+
                 profiler = Profiler()
 
             # Get output directory for extracted images
-            output_dir = getattr(args, '_output_dir', None) if args else None
+            output_dir = getattr(args, "_output_dir", None) if args else None
 
             content, metadata = self.handler.process_document(
                 file_path,
@@ -77,59 +79,57 @@ class OCRProcessorWrapper:
             processing_time = time.time() - start_time
 
             result_dict = {
-                'file_path': file_path,
-                'file_name': os.path.basename(file_path),
-                'success': True,
-                'chosen_method': 'paddleocr_vl',
-                'final_content': content,
-                'processing_time': processing_time,
-                'pages': metadata.get('page_count', 1),
-                'comparison': {},
-                'ocr_result': {
-                    'success': True,
-                    'content': content,
-                    'metadata': metadata,
-                    'error': ''
+                "file_path": file_path,
+                "file_name": os.path.basename(file_path),
+                "success": True,
+                "chosen_method": "paddleocr_vl",
+                "final_content": content,
+                "processing_time": processing_time,
+                "pages": metadata.get("page_count", 1),
+                "comparison": {},
+                "ocr_result": {
+                    "success": True,
+                    "content": content,
+                    "metadata": metadata,
+                    "error": "",
                 },
-                'temp_files': [],
-                'error': ''
+                "temp_files": [],
+                "error": "",
             }
 
             if profiler:
-                result_dict['ocr_result']['metadata']['profile'] = profiler.to_dict()
+                result_dict["ocr_result"]["metadata"]["profile"] = profiler.to_dict()
 
             return result_dict
 
         except Exception as e:
             self.logger.error(f"OCR processing failed for {file_path}: {e}")
             return {
-                'file_path': file_path,
-                'file_name': os.path.basename(file_path),
-                'success': False,
-                'chosen_method': 'paddleocr_vl',
-                'final_content': '',
-                'processing_time': time.time() - start_time,
-                'pages': 0,
-                'comparison': {},
-                'ocr_result': {
-                    'success': False,
-                    'content': '',
-                    'error': str(e)
-                },
-                'temp_files': [],
-                'error': str(e)
+                "file_path": file_path,
+                "file_name": os.path.basename(file_path),
+                "success": False,
+                "chosen_method": "paddleocr_vl",
+                "final_content": "",
+                "processing_time": time.time() - start_time,
+                "pages": 0,
+                "comparison": {},
+                "ocr_result": {"success": False, "content": "", "error": str(e)},
+                "temp_files": [],
+                "error": str(e),
             }
 
     def get_statistics(self) -> dict[str, Any]:
         """Get basic processing statistics."""
-        return {'ocr_processed': 1, 'success_rate': 100.0}
+        return {"ocr_processed": 1, "success_rate": 100.0}
 
     def get_detailed_statistics(self) -> dict[str, Any]:
         """Get comprehensive processing statistics."""
         return self.get_statistics()
 
 
-def create_ocr_processor_wrapper(use_gpu: bool = True, with_images: bool = False) -> OCRProcessorWrapper:
+def create_ocr_processor_wrapper(
+    use_gpu: bool = True, with_images: bool = False
+) -> OCRProcessorWrapper:
     """
     Create an OCR processor wrapper instance.
 

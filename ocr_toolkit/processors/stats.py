@@ -17,6 +17,7 @@ class ProcessingStats:
     This class provides a centralized way to track processing metrics
     for OCR and other document processing methods.
     """
+
     total_processed: int = 0
     successful_processed: int = 0
     failed_processed: int = 0
@@ -58,27 +59,29 @@ class ProcessingStats:
         """
         if self.total_processed == 0:
             return {
-                'total_processed': 0,
-                'total_pages': 0,
-                'success_rate': 0.0,
-                'average_time_per_file': 0.0,
-                'average_time_per_page': 0.0,
-                'total_processing_time': 0.0,
-                'method_stats': {}
+                "total_processed": 0,
+                "total_pages": 0,
+                "success_rate": 0.0,
+                "average_time_per_file": 0.0,
+                "average_time_per_page": 0.0,
+                "total_processing_time": 0.0,
+                "method_stats": {},
             }
 
-        average_time_per_page = (self.total_processing_time / self.total_pages) if self.total_pages > 0 else 0.0
+        average_time_per_page = (
+            (self.total_processing_time / self.total_pages) if self.total_pages > 0 else 0.0
+        )
 
         return {
-            'total_processed': self.total_processed,
-            'successful_processed': self.successful_processed,
-            'failed_processed': self.failed_processed,
-            'total_pages': self.total_pages,
-            'success_rate': (self.successful_processed / self.total_processed) * 100,
-            'average_time_per_file': self.total_processing_time / self.total_processed,
-            'average_time_per_page': average_time_per_page,
-            'total_processing_time': self.total_processing_time,
-            'method_stats': self.method_stats.copy()
+            "total_processed": self.total_processed,
+            "successful_processed": self.successful_processed,
+            "failed_processed": self.failed_processed,
+            "total_pages": self.total_pages,
+            "success_rate": (self.successful_processed / self.total_processed) * 100,
+            "average_time_per_file": self.total_processing_time / self.total_processed,
+            "average_time_per_page": average_time_per_page,
+            "total_processing_time": self.total_processing_time,
+            "method_stats": self.method_stats.copy(),
         }
 
     def reset(self):

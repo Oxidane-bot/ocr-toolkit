@@ -22,13 +22,14 @@ class ProcessingResult:
     This class provides a consistent interface for all processing results,
     making it easier to handle responses from different processors.
     """
+
     success: bool
     content: str
     processing_time: float
     method: str
-    error: str = ''
-    file_path: str = ''
-    file_name: str = ''
+    error: str = ""
+    file_path: str = ""
+    file_name: str = ""
     pages: int = 0
     temp_files: list[str] = None
     metadata: dict[str, Any] = None
@@ -47,16 +48,16 @@ class ProcessingResult:
     def to_dict(self) -> dict[str, Any]:
         """Convert result to dictionary for backward compatibility."""
         return {
-            'success': self.success,
-            'content': self.content,
-            'processing_time': self.processing_time,
-            'method': self.method,
-            'error': self.error,
-            'file_path': self.file_path,
-            'file_name': self.file_name,
-            'pages': self.pages,
-            'temp_files': self.temp_files,
-            'metadata': self.metadata
+            "success": self.success,
+            "content": self.content,
+            "processing_time": self.processing_time,
+            "method": self.method,
+            "error": self.error,
+            "file_path": self.file_path,
+            "file_name": self.file_name,
+            "pages": self.pages,
+            "temp_files": self.temp_files,
+            "metadata": self.metadata,
         }
 
 
@@ -123,15 +124,15 @@ class FileProcessorBase(ABC):
         """
         return ProcessingResult(
             success=False,
-            content='',
+            content="",
             processing_time=time.time() - start_time,
             method=method,
             file_path=file_path,
             file_name=os.path.basename(file_path),
-            error='',
+            error="",
             pages=0,
             temp_files=[],
-            metadata={}
+            metadata={},
         )
 
     def _handle_exception(self, e: Exception, result: ProcessingResult) -> ProcessingResult:
@@ -177,7 +178,7 @@ class FileProcessorBase(ABC):
 
         try:
             # Test if file is readable
-            with open(file_path, 'rb') as f:
+            with open(file_path, "rb") as f:
                 f.read(1)
             return True
         except (OSError, PermissionError) as e:

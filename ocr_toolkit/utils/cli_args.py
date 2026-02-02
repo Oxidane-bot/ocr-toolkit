@@ -24,23 +24,20 @@ def add_common_ocr_args(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
         The parser with added arguments
     """
     parser.add_argument(
-        "--cpu",
-        action="store_true",
-        help="Force use of CPU even if GPU is available"
+        "--cpu", action="store_true", help="Force use of CPU even if GPU is available"
     )
     parser.add_argument(
         "--pages",
         type=str,
         default=None,
-        help="Process only selected pages, e.g. '1-30' or '1-5,10,20-25'"
+        help="Process only selected pages, e.g. '1-30' or '1-5,10,20-25'",
     )
     parser.add_argument(
         "--profile",
         action="store_true",
-        help="Print fine-grained timing (startup, load, per-page, totals)"
+        help="Print fine-grained timing (startup, load, per-page, totals)",
     )
     return parser
-
 
 
 def add_output_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -57,31 +54,24 @@ def add_output_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
         "--output-dir",
         type=str,
         default=None,
-        help=f"Output directory for files (default: '{config.DEFAULT_MARKDOWN_OUTPUT_DIR}' in input directory)"
+        help=f"Output directory for files (default: '{config.DEFAULT_MARKDOWN_OUTPUT_DIR}' in input directory)",
     )
     parser.add_argument(
-        "--preserve-structure", "-p",
+        "--preserve-structure",
+        "-p",
         action="store_true",
-        help="Preserve original directory structure in output (when processing directories)"
+        help="Preserve original directory structure in output (when processing directories)",
     )
     parser.add_argument(
         "--no-recursive",
         action="store_true",
-        help="Disable recursive search in directories (process only top-level files)"
+        help="Disable recursive search in directories (process only top-level files)",
     )
     parser.add_argument(
         "--with-images",
         action="store_true",
-        help="Extract and save images with Markdown image links (default: text-only output)"
+        help="Extract and save images with Markdown image links (default: text-only output)",
     )
-    parser.add_argument(
-        "--quiet", "-q",
-        action="store_true",
-        help="Reduce output verbosity"
-    )
-    parser.add_argument(
-        "--verbose", "-v",
-        action="store_true",
-        help="Increase output verbosity"
-    )
+    parser.add_argument("--quiet", "-q", action="store_true", help="Reduce output verbosity")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Increase output verbosity")
     return parser

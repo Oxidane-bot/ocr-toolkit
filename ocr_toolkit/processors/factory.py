@@ -29,6 +29,7 @@ class ProcessorFactory:
         """Register the OCR processor class."""
         try:
             from .ocr_processor import OCRProcessor
+
             self._ocr_processor_class = OCRProcessor
             self.logger.debug("Registered OCR processor")
         except ImportError as e:
@@ -67,7 +68,7 @@ class ProcessorFactory:
         Returns:
             Processor instance or None if type not supported
         """
-        if processor_type == 'ocr':
+        if processor_type == "ocr":
             return self.create_ocr_processor(**kwargs)
 
         self.logger.error(f"Unsupported processor type: {processor_type}")
@@ -88,6 +89,7 @@ class ProcessorFactory:
 
         # Check if file is supported by OCR
         from ..config import get_ocr_supported_formats
+
         if file_ext in get_ocr_supported_formats():
             return self.create_ocr_processor(**kwargs)
 

@@ -136,7 +136,17 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["N802", "N803"]  # Allow non-lowercase function names in tests
+"tests/**/*.py" = ["N802", "N803", "E712", "E722", "E741", "SIM102", "SIM105", "B007", "W291", "W293"]  # Test file allowances
+# E402: Module level import not at top of file - needed for PaddlePaddle environment setup
+"ocr_toolkit/cli/benchmark.py" = ["E402"]
+"ocr_toolkit/cli/convert.py" = ["E402"]
+"ocr_toolkit/processors/paddleocr_vl_handler.py" = ["E402"]
+# F401: Import for availability check
+"ocr_toolkit/utils/model_loader.py" = ["F401"]
+# F841: Unused variable from old API compatibility
+"ocr_toolkit/processors/ocr_processor.py" = ["F841"]
+# E402: Test imports
+"tests/integration/test_preserve_structure_integration.py" = ["E402"]
 
 [tool.ruff.format]
 quote-style = "double"

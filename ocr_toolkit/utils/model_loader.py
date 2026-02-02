@@ -20,28 +20,29 @@ def setup_nvidia_dll_paths():
     need to be explicitly added to the DLL search path to prevent crashes
     when importing paddle or other CUDA-linked libraries.
     """
-    if sys.platform != 'win32':
+    if sys.platform != "win32":
         return
 
     logger = logging.getLogger(__name__)
-    nvidia_packages = ['nvidia.cudnn', 'nvidia.cublas', 'nvidia.cuda_runtime', 'nvidia.curand']
+    nvidia_packages = ["nvidia.cudnn", "nvidia.cublas", "nvidia.cuda_runtime", "nvidia.curand"]
 
     for pkg in nvidia_packages:
         try:
             # We use importlib to find the package path without potentially
             # triggering the crash that a full import might cause if it's already linked.
             import importlib.util
+
             spec = importlib.util.find_spec(pkg)
             if spec and spec.submodule_search_locations:
                 package_path = spec.submodule_search_locations[0]
-                bin_path = os.path.join(package_path, 'bin')
+                bin_path = os.path.join(package_path, "bin")
 
                 if os.path.exists(bin_path):
                     logger.debug(f"Adding NVIDIA DLL directory: {bin_path}")
                     # Add to PATH for older Python versions and general compatibility
-                    os.environ['PATH'] = bin_path + os.pathsep + os.environ.get('PATH', '')
+                    os.environ["PATH"] = bin_path + os.pathsep + os.environ.get("PATH", "")
                     # Use add_dll_directory for Python 3.8+ (Windows)
-                    if hasattr(os, 'add_dll_directory'):
+                    if hasattr(os, "add_dll_directory"):
                         try:
                             os.add_dll_directory(bin_path)
                         except Exception as e:
@@ -53,16 +54,17 @@ def setup_nvidia_dll_paths():
     # Additional fallback: search site-packages directly if find_spec failed
     try:
         import site
+
         site_packages = site.getsitepackages()
         for site_pkg in site_packages:
-            nvidia_base = os.path.join(site_pkg, 'nvidia')
+            nvidia_base = os.path.join(site_pkg, "nvidia")
             if os.path.exists(nvidia_base):
                 for nvidia_pkg in os.listdir(nvidia_base):
-                    pkg_bin_path = os.path.join(nvidia_base, nvidia_pkg, 'bin')
+                    pkg_bin_path = os.path.join(nvidia_base, nvidia_pkg, "bin")
                     if os.path.exists(pkg_bin_path):
                         logger.debug(f"Adding NVIDIA DLL directory (fallback): {pkg_bin_path}")
-                        os.environ['PATH'] = pkg_bin_path + os.pathsep + os.environ.get('PATH', '')
-                        if hasattr(os, 'add_dll_directory'):
+                        os.environ["PATH"] = pkg_bin_path + os.pathsep + os.environ.get("PATH", "")
+                        if hasattr(os, "add_dll_directory"):
                             try:
                                 os.add_dll_directory(pkg_bin_path)
                             except Exception as e:
@@ -98,15 +100,17 @@ def load_ocr_model(use_cpu: bool = False):
         import paddle
 
         # Verify PaddlePaddle version
-        paddle_version = getattr(paddle, '__version__', 'unknown')
+        paddle_version = getattr(paddle, "__version__", "unknown")
         logging.info(f"PaddlePaddle version: {paddle_version}")
 
         # Check if version is 3.0+
-        version_parts = paddle_version.split('.')
+        version_parts = paddle_version.split(".")
         major_version = int(version_parts[0]) if version_parts and version_parts[0].isdigit() else 0
 
         if major_version < 3:
-            logging.warning(f"PaddlePaddle version {paddle_version} detected. PaddleOCR 3.x requires PaddlePaddle 3.0+")
+            logging.warning(
+                f"PaddlePaddle version {paddle_version} detected. PaddleOCR 3.x requires PaddlePaddle 3.0+"
+            )
 
         if use_cpu:
             logging.info("PaddlePaddle CPU mode requested")
@@ -125,11 +129,13 @@ def load_ocr_model(use_cpu: bool = False):
         # Verify PaddleOCR 3.x is available
         try:
             import paddleocr
-            ocr_version = getattr(paddleocr, '__version__', 'unknown')
+
+            ocr_version = getattr(paddleocr, "__version__", "unknown")
             logging.info(f"PaddleOCR version: {ocr_version}")
 
             # Check for PaddleOCRVL class (PaddleOCR 3.x feature)
             from paddleocr import PaddleOCR
+
             logging.info("PaddleOCR 3.x is available")
         except ImportError as e:
             raise RuntimeError(f"PaddleOCR 3.x not installed: {e}. Please install paddleocr>=3.0.0")
@@ -154,11 +160,11 @@ def get_device_info() -> dict[str, Any]:
         Dictionary with device information
     """
     device_info = {
-        'paddle_available': False,
-        'paddle_version': None,
-        'cuda_available': False,
-        'cuda_device_count': 0,
-        'cuda_device_name': None,
+        "paddle_available": False,
+        "paddle_version": None,
+        "cuda_available": False,
+        "cuda_device_count": 0,
+        "cuda_device_name": None,
     }
 
     # Setup NVIDIA DLL paths on Windows before importing paddle
@@ -167,14 +173,14 @@ def get_device_info() -> dict[str, Any]:
     try:
         import paddle
 
-        device_info['paddle_available'] = True
-        device_info['paddle_version'] = getattr(paddle, '__version__', 'unknown')
+        device_info["paddle_available"] = True
+        device_info["paddle_version"] = getattr(paddle, "__version__", "unknown")
 
         if paddle.is_compiled_with_cuda():
-            device_info['cuda_available'] = True
-            device_info['cuda_device_count'] = paddle.device.cuda.device_count()
-            if device_info['cuda_device_count'] > 0:
-                device_info['cuda_device_name'] = paddle.device.cuda.get_device_name(0)
+            device_info["cuda_available"] = True
+            device_info["cuda_device_count"] = paddle.device.cuda.device_count()
+            if device_info["cuda_device_count"] > 0:
+                device_info["cuda_device_name"] = paddle.device.cuda.get_device_name(0)
 
     except ImportError:
         pass

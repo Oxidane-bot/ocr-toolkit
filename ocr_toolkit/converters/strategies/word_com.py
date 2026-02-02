@@ -31,10 +31,10 @@ class WordComStrategy(ConversionStrategy):
             Dictionary with conversion results
         """
         result = {
-            'method': self.get_method_name(),
-            'success': False,
-            'processing_time': 0,
-            'error': ''
+            "method": self.get_method_name(),
+            "success": False,
+            "processing_time": 0,
+            "error": "",
         }
 
         start_time = time.time()
@@ -56,14 +56,14 @@ class WordComStrategy(ConversionStrategy):
                 OptimizeFor=0,  # Print optimization
                 BitmapMissingFonts=True,
                 DocStructureTags=True,
-                CreateBookmarks=0
+                CreateBookmarks=0,
             )
 
-            result['success'] = True
+            result["success"] = True
             logging.info(f"Successfully converted {input_path} to PDF using Word COM")
 
         except Exception as e:
-            result['error'] = str(e)
+            result["error"] = str(e)
             logging.error(f"Word COM conversion failed for {input_path}: {e}")
 
         finally:
@@ -75,7 +75,7 @@ class WordComStrategy(ConversionStrategy):
             except Exception:
                 pass
 
-        result['processing_time'] = time.time() - start_time
+        result["processing_time"] = time.time() - start_time
         return result
 
     def supports_format(self, file_extension: str) -> bool:
@@ -88,8 +88,8 @@ class WordComStrategy(ConversionStrategy):
         Returns:
             True for .doc and .docx files
         """
-        return file_extension.lower() in ['.doc', '.docx']
+        return file_extension.lower() in [".doc", ".docx"]
 
     def get_method_name(self) -> str:
         """Get the name of this conversion method."""
-        return 'word_com'
+        return "word_com"

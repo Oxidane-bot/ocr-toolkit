@@ -12,4 +12,4 @@ from .office_converter import (
     get_office_converter,
 )
 
-__all__ = ['OfficeConverter', 'get_office_converter', 'convert_office_to_pdf', 'create_temp_pdf']
+__all__ = ["OfficeConverter", "get_office_converter", "convert_office_to_pdf", "create_temp_pdf"]

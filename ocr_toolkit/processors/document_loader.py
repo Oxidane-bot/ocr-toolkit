@@ -7,12 +7,9 @@ on Office document to PDF conversion.
 """
 
 import logging
-from pathlib import Path
 
 from ..converters import get_office_converter
 from ..utils import get_path_normalizer
-from ..utils.profiling import Profiler
-from .base import ProcessingResult
 
 
 class DocumentLoader:
@@ -27,10 +24,10 @@ class DocumentLoader:
     """
 
     # Supported formats grouped by type
-    PDF_FORMATS = {'.pdf'}
-    IMAGE_FORMATS = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif'}
-    OFFICE_FORMATS = {'.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx'}
-    TEXT_FORMATS = {'.txt', '.md', '.rtf'}
+    PDF_FORMATS = {".pdf"}
+    IMAGE_FORMATS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".gif"}
+    OFFICE_FORMATS = {".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx"}
+    TEXT_FORMATS = {".txt", ".md", ".rtf"}
 
     def __init__(self):
         """Initialize document loader with required utilities."""
@@ -46,12 +43,7 @@ class DocumentLoader:
         Returns:
             List of supported file extensions (lowercase, with dot)
         """
-        all_formats = (
-            cls.PDF_FORMATS |
-            cls.IMAGE_FORMATS |
-            cls.OFFICE_FORMATS |
-            cls.TEXT_FORMATS
-        )
+        all_formats = cls.PDF_FORMATS | cls.IMAGE_FORMATS | cls.OFFICE_FORMATS | cls.TEXT_FORMATS
         return sorted(all_formats)
 
     @classmethod
@@ -66,8 +58,8 @@ class DocumentLoader:
             True if format is supported, False otherwise
         """
         ext = file_extension.lower()
-        if not ext.startswith('.'):
-            ext = '.' + ext
+        if not ext.startswith("."):
+            ext = "." + ext
 
         return ext in cls.get_supported_formats()
 

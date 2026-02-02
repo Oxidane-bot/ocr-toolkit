@@ -12,7 +12,6 @@ The processor has been refactored following high-cohesion, low-coupling principl
 """
 
 import logging
-import os
 import time
 from pathlib import Path
 
@@ -95,15 +94,15 @@ class OCRProcessor(FileProcessorBase):
             ProcessingResult object with processing results
         """
         start_time = time.time()
-        result = self._create_result(file_path, 'ocr', start_time)
+        result = self._create_result(file_path, "ocr", start_time)
 
         fast = bool(kwargs.get("fast", False))
-        pages = kwargs.get("pages", None)
+        pages = kwargs.get("pages")
         profile_enabled = bool(kwargs.get("profile", False))
         profiler = Profiler() if profile_enabled else None
 
         if not self._validate_file(file_path):
-            result.error = f'Invalid file: {file_path}'
+            result.error = f"Invalid file: {file_path}"
             result.processing_time = time.time() - start_time
             return result
 
@@ -111,7 +110,7 @@ class OCRProcessor(FileProcessorBase):
             ext = Path(file_path).suffix.lower()
 
             if not self.supports_format(ext):
-                result.error = f'Unsupported file format for OCR: {ext}'
+                result.error = f"Unsupported file format for OCR: {ext}"
                 result.processing_time = time.time() - start_time
                 return result
 
@@ -133,12 +132,16 @@ class OCRProcessor(FileProcessorBase):
                     result.content = excel_result.content
                     result.success = True
                     result.pages = excel_result.pages
-                    self.logger.debug(f"Extracted data from {excel_result.pages} sheets in {file_path}")
+                    self.logger.debug(
+                        f"Extracted data from {excel_result.pages} sheets in {file_path}"
+                    )
                     result.processing_time = time.time() - start_time
                     return result
                 else:
                     # Excel extraction failed, fall back to PDF conversion
-                    self.logger.warning(f"Excel data extraction failed for {file_path}: {excel_result.error}")
+                    self.logger.warning(
+                        f"Excel data extraction failed for {file_path}: {excel_result.error}"
+                    )
                     self.logger.info(f"Falling back to PDF conversion for {file_path}")
 
             # Process with PaddleOCR (handles PDFs and images directly)
@@ -149,7 +152,7 @@ class OCRProcessor(FileProcessorBase):
                 temp_pdf = office_converter.create_temp_pdf(file_path)
 
                 if not temp_pdf:
-                    result.error = f'Failed to convert Office document to PDF: {file_path}'
+                    result.error = f"Failed to convert Office document to PDF: {file_path}"
                     result.processing_time = time.time() - start_time
                     return result
 
@@ -167,7 +170,7 @@ class OCRProcessor(FileProcessorBase):
 
             result.content = content
             result.success = True
-            result.pages = metadata.get('page_count', 1)
+            result.pages = metadata.get("page_count", 1)
             result.metadata.update(metadata)
 
             self.logger.debug(f"OCR processed {file_path} successfully with {result.pages} pages")

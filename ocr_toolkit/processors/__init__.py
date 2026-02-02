@@ -9,10 +9,10 @@ from .paddleocr_vl_handler import PaddleOCRVLHandler
 from .text_file_processor import TextFileProcessor
 
 __all__ = [
-    'FileProcessorBase',
-    'ProcessingResult',
-    'PaddleOCRVLHandler',
-    'DocumentLoader',
-    'ExcelDataProcessor',
-    'TextFileProcessor',
+    "FileProcessorBase",
+    "ProcessingResult",
+    "PaddleOCRVLHandler",
+    "DocumentLoader",
+    "ExcelDataProcessor",
+    "TextFileProcessor",
 ]

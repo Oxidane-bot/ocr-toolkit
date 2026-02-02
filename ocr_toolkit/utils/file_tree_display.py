@@ -10,7 +10,9 @@ from pathlib import Path
 from .. import config
 
 
-def generate_file_tree(file_relative_paths: dict[str, str], show_all: bool = True, max_display: int = 15) -> str:
+def generate_file_tree(
+    file_relative_paths: dict[str, str], show_all: bool = True, max_display: int = 15
+) -> str:
     """
     Generate a visual file tree from relative paths with smart display strategies.
 
@@ -59,7 +61,7 @@ def generate_file_tree(file_relative_paths: dict[str, str], show_all: bool = Tru
 
         # Convert to .md extension
         rel_path_obj = Path(rel_path)
-        output_rel_path = str(rel_path_obj.with_suffix('.md'))
+        output_rel_path = str(rel_path_obj.with_suffix(".md"))
         output_paths.append(output_rel_path)
 
     # Sort paths for consistent display
@@ -101,7 +103,9 @@ def generate_file_tree(file_relative_paths: dict[str, str], show_all: bool = Tru
     return "\n".join(lines)
 
 
-def _build_tree_lines(tree_dict: dict, lines: list[str], prefix: str, is_last: bool, is_root: bool = False):
+def _build_tree_lines(
+    tree_dict: dict, lines: list[str], prefix: str, is_last: bool, is_root: bool = False
+):
     """
     Recursively build tree lines with Unicode box drawing characters.
 
@@ -128,7 +132,7 @@ def _build_tree_lines(tree_dict: dict, lines: list[str], prefix: str, is_last: b
     all_items = directories + files
 
     for i, (name, subtree) in enumerate(all_items):
-        is_last_item = (i == len(all_items) - 1)
+        is_last_item = i == len(all_items) - 1
 
         if is_root:
             # Root level items
