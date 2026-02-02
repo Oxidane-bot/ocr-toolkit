@@ -87,7 +87,9 @@ def run_benchmark(
         logging.info(f"[{idx}/{len(pdf_files)}] Benchmarking: {os.path.basename(file_path)}")
         start = time.perf_counter()
         try:
-            result = processor.process(file_path, fast=cfg.fast, pages=cfg.pages, profile=cfg.profile)
+            result = processor.process(
+                file_path, fast=cfg.fast, pages=cfg.pages, profile=cfg.profile
+            )
             elapsed = time.perf_counter() - start
             processing_times.append(elapsed)
 
@@ -134,4 +136,3 @@ def run_benchmark(
         "files_per_second": files_per_second,
         "processing_times": processing_times,
     }
-

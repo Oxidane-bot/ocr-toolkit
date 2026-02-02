@@ -19,6 +19,7 @@ from ..utils.temp_file_manager import get_temp_manager
 
 class TimeoutError(Exception):
     """Raised when an operation times out."""
+
     pass
 
 
@@ -87,9 +88,10 @@ class PathNormalizer:
         """
         try:
             # Try to open the file in read mode
-            with open(file_path, 'rb') as f:
+            with open(file_path, "rb") as f:
                 # Try to acquire an exclusive lock (Windows specific check)
                 import msvcrt
+
                 try:
                     msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
                     msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
@@ -121,7 +123,7 @@ class PathNormalizer:
         copied_bytes = 0
 
         try:
-            with open(source, 'rb') as src, open(destination, 'wb') as dst:
+            with open(source, "rb") as src, open(destination, "wb") as dst:
                 while True:
                     chunk = src.read(chunk_size)
                     if not chunk:
@@ -134,14 +136,18 @@ class PathNormalizer:
                     if source_size > 10 * 1024 * 1024:  # > 10MB
                         progress = (copied_bytes / source_size) * 100
                         if copied_bytes % (1024 * 1024) == 0:  # Every MB
-                            self.logger.debug(f"Copy progress: {progress:.1f}% ({copied_bytes}/{source_size} bytes)")
+                            self.logger.debug(
+                                f"Copy progress: {progress:.1f}% ({copied_bytes}/{source_size} bytes)"
+                            )
 
                     # Yield control to allow timeout mechanism to work
                     time.sleep(0.001)  # 1ms sleep to prevent tight loop
 
             # Verify the copy was successful
             if os.path.getsize(destination) != source_size:
-                raise OSError(f"File copy incomplete: expected {source_size} bytes, got {os.path.getsize(destination)} bytes")
+                raise OSError(
+                    f"File copy incomplete: expected {source_size} bytes, got {os.path.getsize(destination)} bytes"
+                )
 
         except Exception as e:
             # Clean up partial file on error
@@ -151,7 +157,6 @@ class PathNormalizer:
             except Exception:
                 pass
             raise OSError(f"File copy failed: {e}") from e
-
 
     def normalize_path(self, file_path: str) -> str:
         """
@@ -176,7 +181,7 @@ class PathNormalizer:
                 return file_path
 
             # On Windows, check if path contains non-ASCII characters
-            if os.name == 'nt':  # Windows
+            if os.name == "nt":  # Windows
                 return self._handle_windows_path(file_path, path_obj)
             else:
                 # On Unix-like systems, try to resolve the path
@@ -213,13 +218,12 @@ class PathNormalizer:
             try:
                 # Get file size for logging
                 file_size = path_obj.stat().st_size
-                self.logger.info(f"File size: {file_size / (1024*1024):.2f} MB")
+                self.logger.info(f"File size: {file_size / (1024 * 1024):.2f} MB")
 
                 # Create a temporary file with ASCII name
                 temp_name = f"ocr_temp_{hash(file_path) % 10000}{path_obj.suffix}"
                 temp_path = self.temp_manager.create_temp_file(
-                    suffix=path_obj.suffix,
-                    prefix="path_norm_"
+                    suffix=path_obj.suffix, prefix="path_norm_"
                 )
 
                 # Remove the temp file created by temp_manager and create with our name
@@ -250,7 +254,9 @@ class PathNormalizer:
             except OSError as e:
                 if "locked by another process" in str(e):
                     self.logger.error(f"File is locked by another process: {file_path}")
-                    self.logger.error("Please close any applications that might be using this file and try again")
+                    self.logger.error(
+                        "Please close any applications that might be using this file and try again"
+                    )
                 else:
                     self.logger.error(f"File operation failed: {e}")
                 return file_path
@@ -283,11 +289,11 @@ class PathNormalizer:
             return False
 
         # Check for non-ASCII characters on Windows
-        if os.name == 'nt':
+        if os.name == "nt":
             return any(ord(char) > config.ASCII_BOUNDARY for char in file_path)
 
         # On other systems, check for other potential issues
-        problematic_chars = ['<', '>', ':', '"', '|', '?', '*']
+        problematic_chars = ["<", ">", ":", '"', "|", "?", "*"]
         return any(char in file_path for char in problematic_chars)
 
     def get_safe_filename(self, filename: str, max_length: int = 255) -> str:
@@ -307,12 +313,12 @@ class PathNormalizer:
         # Replace problematic characters
         safe_chars = []
         for char in filename:
-            if char.isalnum() or char in '.-_':
+            if char.isalnum() or char in ".-_":
                 safe_chars.append(char)
             else:
-                safe_chars.append('_')
+                safe_chars.append("_")
 
-        safe_name = ''.join(safe_chars)
+        safe_name = "".join(safe_chars)
 
         # Trim to max length while preserving extension
         if len(safe_name) > max_length:
@@ -321,7 +327,7 @@ class PathNormalizer:
             safe_name = name_part[:max_name_length] + ext_part
 
         # Ensure it's not empty
-        if not safe_name or safe_name.startswith('.'):
+        if not safe_name or safe_name.startswith("."):
             safe_name = "file_" + safe_name
 
         return safe_name

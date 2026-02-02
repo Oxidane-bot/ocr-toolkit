@@ -66,4 +66,3 @@ def parse_pages_arg(pages: str | None) -> ParsedPages | None:
             indices.add(page - 1)
 
     return ParsedPages(indices=sorted(indices))
-

@@ -2,12 +2,13 @@
 Pytest configuration and fixtures for OCR toolkit tests.
 """
 
-import pytest
 import os
+import shutil
 import sys
 import tempfile
-import shutil
 from pathlib import Path
+
+import pytest
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -18,10 +19,10 @@ TEST_FILES_DIR = project_root / "testFile"
 
 # Individual test files
 TEST_FILES = {
-    'pdf1': TEST_FILES_DIR / "instructions for writing 4-1.pdf",
-    'pdf2': TEST_FILES_DIR / "lesson4.pdf", 
-    'image1': TEST_FILES_DIR / "choice question.jpg",
-    'image2': TEST_FILES_DIR / "discussion 4 instructions.jpg"
+    "pdf1": TEST_FILES_DIR / "instructions for writing 4-1.pdf",
+    "pdf2": TEST_FILES_DIR / "lesson4.pdf",
+    "image1": TEST_FILES_DIR / "choice question.jpg",
+    "image2": TEST_FILES_DIR / "discussion 4 instructions.jpg",
 }
 
 
@@ -32,7 +33,7 @@ def test_files():
     missing_files = [name for name, path in TEST_FILES.items() if not path.exists()]
     if missing_files:
         pytest.skip(f"Test files missing: {missing_files}")
-    
+
     return TEST_FILES
 
 
@@ -48,7 +49,7 @@ def temp_dir():
 def sample_text_file(temp_dir):
     """Create a sample text file for testing."""
     file_path = os.path.join(temp_dir, "sample.txt")
-    with open(file_path, 'w', encoding='utf-8') as f:
+    with open(file_path, "w", encoding="utf-8") as f:
         f.write("This is sample text for testing.")
     return file_path
 
@@ -77,9 +78,9 @@ This document has good structure."""
 def mock_ocr_result():
     """Mock OCR processing result for testing."""
     return {
-        'success': True,
-        'content': 'OCR extracted text content',
-        'processing_time': 1.5,
-        'method': 'ocr',
-        'error': ''
+        "success": True,
+        "content": "OCR extracted text content",
+        "processing_time": 1.5,
+        "method": "ocr",
+        "error": "",
     }

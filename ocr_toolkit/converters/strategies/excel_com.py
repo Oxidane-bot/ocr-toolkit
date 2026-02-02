@@ -35,10 +35,10 @@ class ExcelComStrategy(ConversionStrategy):
             Dictionary with conversion results
         """
         result = {
-            'method': self.get_method_name(),
-            'success': False,
-            'processing_time': 0,
-            'error': ''
+            "method": self.get_method_name(),
+            "success": False,
+            "processing_time": 0,
+            "error": "",
         }
 
         start_time = time.time()
@@ -59,14 +59,14 @@ class ExcelComStrategy(ConversionStrategy):
                 Quality=0,  # Standard quality
                 IncludeDocProps=True,
                 IgnorePrintAreas=False,
-                OpenAfterPublish=False
+                OpenAfterPublish=False,
             )
 
-            result['success'] = True
+            result["success"] = True
             logging.info(f"Successfully converted {input_path} to PDF using Excel COM")
 
         except Exception as e:
-            result['error'] = str(e)
+            result["error"] = str(e)
             logging.error(f"Excel COM conversion failed for {input_path}: {e}")
 
         finally:
@@ -78,7 +78,7 @@ class ExcelComStrategy(ConversionStrategy):
             except Exception:
                 pass
 
-        result['processing_time'] = time.time() - start_time
+        result["processing_time"] = time.time() - start_time
         return result
 
     def supports_format(self, file_extension: str) -> bool:
@@ -91,8 +91,8 @@ class ExcelComStrategy(ConversionStrategy):
         Returns:
             True for .xls and .xlsx files
         """
-        return file_extension.lower() in ['.xls', '.xlsx']
+        return file_extension.lower() in [".xls", ".xlsx"]
 
     def get_method_name(self) -> str:
         """Get the name of this conversion method."""
-        return 'excel_com'
+        return "excel_com"

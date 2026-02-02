@@ -48,4 +48,3 @@ class Profiler:
             name: {"total_s": stat.total_s, "count": stat.count, "avg_s": stat.avg_s}
             for name, stat in self._stats.items()
         }
-

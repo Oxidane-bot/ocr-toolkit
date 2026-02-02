@@ -14,28 +14,19 @@ for robust document parsing with support for:
 
 import logging
 import os
-import sys
-import tempfile
 import shutil
-from pathlib import Path
+import tempfile
 from contextlib import redirect_stderr
 from io import StringIO
+from pathlib import Path
 
-# IMPORTANT: Set environment variables and logging levels BEFORE any PaddlePaddle imports
-# to suppress noisy output during initialization
-os.environ['PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK'] = 'True'
-os.environ['PADDLE_SDK_CHECK_CONNECTIVITY'] = 'False'
-os.environ['GLOG_MINLOGLEVEL'] = '3'  # Only show FATAL errors
-os.environ['GLOG_V'] = '0'  # Set verbosity to 0
-os.environ['FLAGS_logtostderr'] = '0'  # Don't log to stderr
+# IMPORTANT: Configure PaddlePaddle environment BEFORE any PaddlePaddle imports
+from ..utils.paddle_config import configure_paddle_environment
 
-from ..utils.profiling import Profiler
+configure_paddle_environment()
+
 from ..utils.model_loader import setup_nvidia_dll_paths
-
-# Suppress PaddleX and PaddlePaddle logging (after utils import to avoid circular dependency)
-logging.getLogger('paddlex').setLevel(logging.ERROR)
-logging.getLogger('paddle').setLevel(logging.ERROR)
-logging.getLogger('Paddle').setLevel(logging.ERROR)
+from ..utils.profiling import Profiler
 
 
 class PaddleOCRVLHandler:
@@ -46,7 +37,9 @@ class PaddleOCRVLHandler:
     document analysis with vision-language models.
     """
 
-    def __init__(self, use_gpu: bool = True, model_name: str = "PaddleOCR-VL-1.5", with_images: bool = False):
+    def __init__(
+        self, use_gpu: bool = True, model_name: str = "PaddleOCR-VL-1.5", with_images: bool = False
+    ):
         """
         Initialize PaddleOCR-VL-1.5 handler.
 
@@ -80,26 +73,23 @@ class PaddleOCRVLHandler:
             setup_nvidia_dll_paths()
 
             # Suppress noisy PaddleX output by redirecting stderr during initialization
-            from contextlib import redirect_stderr
-            from io import StringIO
-
             stderr_capture = StringIO()
             with redirect_stderr(stderr_capture):
                 # Import PaddleOCR
-                from paddleocr import PaddleOCRVL
                 import paddle
+                from paddleocr import PaddleOCRVL
 
                 # Set device based on use_gpu parameter
                 if self.use_gpu:
                     try:
-                        paddle.set_device('gpu')
+                        paddle.set_device("gpu")
                         self.logger.info("Using GPU for PaddleOCR-VL")
                     except Exception as e:
                         self.logger.warning(f"Failed to set GPU device: {e}. Falling back to CPU.")
-                        paddle.set_device('cpu')
+                        paddle.set_device("cpu")
                         self.use_gpu = False
                 else:
-                    paddle.set_device('cpu')
+                    paddle.set_device("cpu")
                     self.logger.info("Using CPU for PaddleOCR-VL")
 
                 # Initialize the pipeline with device configuration
@@ -111,8 +101,7 @@ class PaddleOCRVLHandler:
 
         except ImportError:
             self.logger.error(
-                "PaddleOCR-VL not available. "
-                "Install with: pip install 'paddleocr[doc-parser]'"
+                "PaddleOCR-VL not available. Install with: pip install 'paddleocr[doc-parser]'"
             )
             self.initialized = False
             return False
@@ -162,10 +151,8 @@ class PaddleOCRVLHandler:
         ext = Path(file_path).suffix.lower()
 
         # For PDF files with page selection, we need to extract specific pages
-        if ext == '.pdf' and pages:
-            return self._process_pdf_with_page_selection(
-                file_path, pages, profiler
-            )
+        if ext == ".pdf" and pages:
+            return self._process_pdf_with_page_selection(file_path, pages, profiler)
 
         # Process single document (image or PDF)
         return self._process_single_document(file_path, profiler)
@@ -210,8 +197,9 @@ class PaddleOCRVLHandler:
         Returns:
             Tuple of (markdown_content, metadata)
         """
-        from ..utils.page_selection import parse_pages_arg
         import pypdfium2 as pdfium
+
+        from ..utils.page_selection import parse_pages_arg
 
         # Parse page selection
         parsed_pages = parse_pages_arg(pages)
@@ -233,9 +221,9 @@ class PaddleOCRVLHandler:
         # Process each selected page
         markdown_pages = []
         metadata = {
-            'total_pages': total_pages,
-            'selected_pages': page_indices,
-            'page_count': len(page_indices),
+            "total_pages": total_pages,
+            "selected_pages": page_indices,
+            "page_count": len(page_indices),
         }
 
         for page_idx in page_indices:
@@ -285,7 +273,7 @@ class PaddleOCRVLHandler:
 
             # Convert to PIL Image and save to temp file
             pil_image = bitmap.to_pil()
-            fd, temp_path = tempfile.mkstemp(suffix='.png')
+            fd, temp_path = tempfile.mkstemp(suffix=".png")
             os.close(fd)
 
             pil_image.save(temp_path)
@@ -306,25 +294,39 @@ class PaddleOCRVLHandler:
             Tuple of (markdown_content, metadata)
         """
         metadata = {
-            'file_path': file_path,
-            'file_name': os.path.basename(file_path),
-            'engine': 'paddleocr_vl',
+            "file_path": file_path,
+            "file_name": os.path.basename(file_path),
+            "engine": "paddleocr_vl",
         }
 
         markdown_content = ""
+        image_metadata_list = []
 
         # PaddleOCR-VL returns result objects with save_to_markdown method
-        if hasattr(output, '__iter__') and not isinstance(output, (str, dict)):
+        if hasattr(output, "__iter__") and not isinstance(output, (str, dict)):
             # Handle iterable output (list of results)
             for result in output:
-                markdown_content += self._extract_single_result(result)
+                content, img_meta = self._extract_single_result(result)
+                markdown_content += content
+                if img_meta:
+                    image_metadata_list.append(img_meta)
         else:
             # Single result
-            markdown_content = self._extract_single_result(output)
+            content, img_meta = self._extract_single_result(output)
+            markdown_content = content
+            if img_meta:
+                image_metadata_list.append(img_meta)
+
+        # Add image metadata to the main metadata if any images were extracted
+        if image_metadata_list:
+            metadata["image_metadata"] = image_metadata_list
+            metadata["total_extracted_images"] = sum(
+                m.get("extracted_images", 0) for m in image_metadata_list
+            )
 
         return markdown_content, metadata
 
-    def _extract_single_result(self, result) -> str:
+    def _extract_single_result(self, result) -> tuple[str, dict | None]:
         """
         Extract markdown from a single result object.
 
@@ -332,30 +334,35 @@ class PaddleOCRVLHandler:
             result: Single result from PaddleOCR-VL
 
         Returns:
-            Extracted markdown content
+            Tuple of (markdown_content, image_metadata)
+            image_metadata is None if no images were extracted, otherwise contains:
+            - extracted_images: count of extracted images
+            - images_dir: directory name for the images
         """
         # Check for save_to_markdown method
-        if hasattr(result, 'save_to_markdown'):
+        if hasattr(result, "save_to_markdown"):
             # Create temp directory and save markdown
             temp_dir = tempfile.mkdtemp()
+            image_metadata = None
             try:
                 result.save_to_markdown(save_path=temp_dir)
 
                 # Find the generated markdown file
-                md_files = [f for f in os.listdir(temp_dir) if f.endswith('.md')]
+                md_files = [f for f in os.listdir(temp_dir) if f.endswith(".md")]
                 if md_files:
                     md_path = os.path.join(temp_dir, md_files[0])
-                    with open(md_path, 'r', encoding='utf-8') as f:
+                    with open(md_path, encoding="utf-8") as f:
                         content = f.read()
 
                     # Handle images based on with_images setting
-                    imgs_dir = os.path.join(temp_dir, 'imgs')
+                    imgs_dir = os.path.join(temp_dir, "imgs")
                     if self.with_images and self._output_dir and os.path.exists(imgs_dir):
                         # Create a unique imgs subdirectory for this document
                         # Use a timestamp-based directory name to avoid conflicts
                         import time
+
                         timestamp = str(int(time.time() * 1000))
-                        output_imgs_dir = os.path.join(self._output_dir, f'imgs_{timestamp}')
+                        output_imgs_dir = os.path.join(self._output_dir, f"imgs_{timestamp}")
                         os.makedirs(output_imgs_dir, exist_ok=True)
 
                         # Copy all images
@@ -369,61 +376,57 @@ class PaddleOCRVLHandler:
 
                         # Update markdown content to reference the new image directory
                         if img_files:
-                            content = content.replace('imgs/', f'imgs_{timestamp}/')
-                            metadata = {
-                                'extracted_images': len(img_files),
-                                'images_dir': f'imgs_{timestamp}',
+                            content = content.replace("imgs/", f"imgs_{timestamp}/")
+                            image_metadata = {
+                                "extracted_images": len(img_files),
+                                "images_dir": f"imgs_{timestamp}",
                             }
-                            # Store metadata for later reference
-                            if hasattr(self, '_image_metadata'):
-                                self._image_metadata.append(metadata)
-                            else:
-                                self._image_metadata = [metadata]
                     else:
                         # Remove image links from markdown (text-only mode)
                         import re
-                        # Remove markdown image syntax: ![alt](path)
-                        content = re.sub(r'!\[.*?\]\([^)]+\)', '', content)
-                        # Remove inline image references if any
-                        content = re.sub(r'<img[^>]*>', '', content)
 
-                    return content
+                        # Remove markdown image syntax: ![alt](path)
+                        content = re.sub(r"!\[.*?\]\([^)]+\)", "", content)
+                        # Remove inline image references if any
+                        content = re.sub(r"<img[^>]*>", "", content)
+
+                    return content, image_metadata
 
                 # Fallback to parsing the result dict
-                return self._parse_result_dict(result)
+                return self._parse_result_dict(result), None
             finally:
                 # Clean up temp directory
                 if os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir)
 
         # Check if result is a dict with parsing_res_list
-        if isinstance(result, dict) and 'parsing_res_list' in result:
-            return self._parse_parsing_res_list(result['parsing_res_list'])
+        if isinstance(result, dict) and "parsing_res_list" in result:
+            return self._parse_parsing_res_list(result["parsing_res_list"]), None
 
         # Check for rec_texts attribute (text recognition results)
-        if hasattr(result, 'rec_texts'):
+        if hasattr(result, "rec_texts"):
             texts = result.rec_texts
             if isinstance(texts, list):
-                return "\n".join(texts)
-            return str(texts)
+                return "\n".join(texts), None
+            return str(texts), None
 
         # Check for data attribute
-        if hasattr(result, 'data'):
+        if hasattr(result, "data"):
             data = result.data
             if isinstance(data, dict):
-                if 'parsing_res_list' in data:
-                    return self._parse_parsing_res_list(data['parsing_res_list'])
-                return data.get('markdown', data.get('text', str(data)))
-            return str(data)
+                if "parsing_res_list" in data:
+                    return self._parse_parsing_res_list(data["parsing_res_list"]), None
+                return data.get("markdown", data.get("text", str(data))), None
+            return str(data), None
 
         # Dict-like object
-        if hasattr(result, 'get'):
-            if result.get('parsing_res_list'):
-                return self._parse_parsing_res_list(result['parsing_res_list'])
-            return result.get('markdown', result.get('text', str(result)))
+        if hasattr(result, "get"):
+            if result.get("parsing_res_list"):
+                return self._parse_parsing_res_list(result["parsing_res_list"]), None
+            return result.get("markdown", result.get("text", str(result))), None
 
         # Fallback: convert to string
-        return str(result)
+        return str(result), None
 
     def set_output_dir(self, output_dir: str):
         """Set the output directory for extracted images."""
@@ -450,16 +453,16 @@ class PaddleOCRVLHandler:
                 markdown_parts.append(item)
             elif isinstance(item, dict):
                 # Dict with content, bbox, label info
-                label = item.get('label', 'text')
-                content = item.get('content', '')
+                label = item.get("label", "text")
+                content = item.get("content", "")
 
                 if content:
                     # Format based on label type
-                    if label == 'table':
+                    if label == "table":
                         markdown_parts.append(f"\\n{content}\\n")
-                    elif label == 'formula':
+                    elif label == "formula":
                         markdown_parts.append(f"$${content}$$")
-                    elif label == 'title' or label == 'header':
+                    elif label == "title" or label == "header":
                         markdown_parts.append(f"# {content}")
                     else:
                         # Default text
@@ -478,10 +481,10 @@ class PaddleOCRVLHandler:
             Formatted markdown content
         """
         # Try to access the dict representation
-        if hasattr(result, '__dict__'):
+        if hasattr(result, "__dict__"):
             d = result.__dict__
-            if 'parsing_res_list' in d:
-                return self._parse_parsing_res_list(d['parsing_res_list'])
+            if "parsing_res_list" in d:
+                return self._parse_parsing_res_list(d["parsing_res_list"])
 
         # Fallback
         return str(result)

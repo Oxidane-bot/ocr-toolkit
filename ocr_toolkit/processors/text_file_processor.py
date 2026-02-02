@@ -23,7 +23,7 @@ class TextFileProcessor:
     """
 
     # Supported text file formats
-    SUPPORTED_FORMATS = {'.txt', '.md', '.rtf'}
+    SUPPORTED_FORMATS = {".txt", ".md", ".rtf"}
 
     def __init__(self):
         """Initialize text file processor."""
@@ -42,8 +42,8 @@ class TextFileProcessor:
             True if format is supported, False otherwise
         """
         ext = file_extension.lower()
-        if not ext.startswith('.'):
-            ext = '.' + ext
+        if not ext.startswith("."):
+            ext = "." + ext
         return ext in cls.SUPPORTED_FORMATS
 
     def process_file(self, file_path: str) -> str:
@@ -70,11 +70,11 @@ class TextFileProcessor:
 
             # Try UTF-8 first (most common)
             try:
-                content = self._read_file(normalized_path, 'utf-8')
+                content = self._read_file(normalized_path, "utf-8")
                 self.logger.debug(f"Successfully read {file_path} with UTF-8 encoding")
             except UnicodeDecodeError:
                 # Fallback to GBK for Chinese files
-                content = self._read_file(normalized_path, 'gbk')
+                content = self._read_file(normalized_path, "gbk")
                 self.logger.debug(f"Successfully read {file_path} with GBK encoding")
 
             # Format based on file type
@@ -114,7 +114,7 @@ class TextFileProcessor:
             Formatted markdown string
         """
         # For markdown files, return content as-is
-        if ext == '.md':
+        if ext == ".md":
             return content
 
         # For other text files, wrap in markdown format with filename as header
@@ -128,4 +128,4 @@ class TextFileProcessor:
         Returns:
             List of encoding names
         """
-        return ['utf-8', 'gbk']
+        return ["utf-8", "gbk"]
