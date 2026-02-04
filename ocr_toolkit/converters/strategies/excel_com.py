@@ -53,13 +53,11 @@ class ExcelComStrategy(ConversionStrategy):
             workbook = excel.Workbooks.Open(os.path.abspath(input_path))
 
             # Export as PDF (format 0 = PDF)
+            # Excel ExportAsFixedFormat parameters: Type, Filename, Quality, ...
+            # Some Excel versions don't support all named parameters, use positional
             workbook.ExportAsFixedFormat(
-                Type=0,  # PDF format
-                Filename=os.path.abspath(output_path),
-                Quality=0,  # Standard quality
-                IncludeDocProps=True,
-                IgnorePrintAreas=False,
-                OpenAfterPublish=False,
+                0,  # Type: PDF format
+                os.path.abspath(output_path),  # Filename
             )
 
             result["success"] = True

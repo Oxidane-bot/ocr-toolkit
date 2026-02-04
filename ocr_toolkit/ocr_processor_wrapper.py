@@ -8,6 +8,7 @@ PaddleOCR-VL-1.5 for document structure analysis.
 import logging
 import os
 import time
+from pathlib import Path
 from typing import Any
 
 
@@ -53,6 +54,7 @@ class OCRProcessorWrapper:
             Result dictionary with processing information
         """
         start_time = time.time()
+        temp_files = []
 
         try:
             # Get processing parameters
@@ -69,8 +71,26 @@ class OCRProcessorWrapper:
             # Get output directory for extracted images
             output_dir = getattr(args, "_output_dir", None) if args else None
 
+            # Convert Office documents to temporary PDF first
+            actual_file_path = file_path
+            ext = Path(file_path).suffix.lower()
+
+            # Office formats that need conversion to PDF
+            office_formats = {".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx"}
+            if ext in office_formats:
+                from .converters import create_temp_pdf
+
+                self.logger.info(f"Converting Office document {ext} to temporary PDF")
+                temp_pdf = create_temp_pdf(file_path)
+                if temp_pdf:
+                    actual_file_path = temp_pdf
+                    temp_files.append(temp_pdf)
+                    self.logger.info(f"Created temporary PDF: {temp_pdf}")
+                else:
+                    raise RuntimeError(f"Failed to convert {file_path} to PDF")
+
             content, metadata = self.handler.process_document(
-                file_path,
+                actual_file_path,
                 output_dir=output_dir,
                 pages=pages,
                 profiler=profiler,
@@ -93,7 +113,7 @@ class OCRProcessorWrapper:
                     "metadata": metadata,
                     "error": "",
                 },
-                "temp_files": [],
+                "temp_files": temp_files,
                 "error": "",
             }
 

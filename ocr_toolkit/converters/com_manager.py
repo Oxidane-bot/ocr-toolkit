@@ -10,6 +10,8 @@ import atexit
 import logging
 from typing import Any
 
+import pythoncom
+
 
 class ComApplicationManager:
     """
@@ -50,6 +52,9 @@ class ComApplicationManager:
         Returns:
             Word application COM object
         """
+        # Initialize COM for this thread
+        pythoncom.CoInitialize()
+
         # Try to use existing instance if available
         if self._word_app is not None:
             try:
@@ -82,6 +87,9 @@ class ComApplicationManager:
         Returns:
             Excel application COM object
         """
+        # Initialize COM for this thread
+        pythoncom.CoInitialize()
+
         # Try to use existing instance if available
         if self._excel_app is not None:
             try:
@@ -114,6 +122,9 @@ class ComApplicationManager:
         Returns:
             PowerPoint application COM object
         """
+        # Initialize COM for this thread
+        pythoncom.CoInitialize()
+
         # Try to use existing instance if available
         if self._powerpoint_app is not None:
             try:

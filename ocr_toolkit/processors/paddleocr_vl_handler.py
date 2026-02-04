@@ -301,21 +301,27 @@ class PaddleOCRVLHandler:
 
         markdown_content = ""
         image_metadata_list = []
+        page_count = 0
 
         # PaddleOCR-VL returns result objects with save_to_markdown method
         if hasattr(output, "__iter__") and not isinstance(output, (str, dict)):
-            # Handle iterable output (list of results)
+            # Handle iterable output (list of results) - this happens for multi-page PDFs
             for result in output:
                 content, img_meta = self._extract_single_result(result)
                 markdown_content += content
                 if img_meta:
                     image_metadata_list.append(img_meta)
+                page_count += 1
         else:
-            # Single result
+            # Single result - single image or single page
             content, img_meta = self._extract_single_result(output)
             markdown_content = content
             if img_meta:
                 image_metadata_list.append(img_meta)
+            page_count = 1
+
+        # Add page count to metadata
+        metadata["page_count"] = page_count
 
         # Add image metadata to the main metadata if any images were extracted
         if image_metadata_list:
