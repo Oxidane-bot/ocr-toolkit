@@ -70,11 +70,11 @@ pip install ".[search]"
 
 ```bash
 # CPU version (basic, no GPU acceleration)
-uv tool install .
+uv tool install --python 3.12 .
 
 # GPU/CUDA version (recommended for better OCR performance)
 # Requires CUDA 11.8+ and compatible NVIDIA drivers
-uv tool install --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match .
+uv tool install --python 3.12 --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match .
 ```
 
 **Important CUDA Notes:**
@@ -266,7 +266,7 @@ python -c "import torch; print('CUDA available:', torch.cuda.is_available())"
 
 # Reinstall with CUDA support
 uv tool uninstall ocr-cli
-uv tool install --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match .
+uv tool install --python 3.12 --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match .
 
 # Verify GPU usage (should show "CUDA is available. Using GPU for doctr.")
 ocr-search --help  # Check if tools are available

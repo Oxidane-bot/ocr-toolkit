@@ -69,11 +69,11 @@ pip install ".[search]"
 
 ```bash
 # CPU版本 (基础版本，无GPU加速)
-uv tool install .
+uv tool install --python 3.12 .
 
 # GPU/CUDA版本 (推荐，更快的OCR性能)
 # 需要CUDA 11.8+和兼容的NVIDIA驱动
-uv tool install --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match .
+uv tool install --python 3.12 --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match .
 ```
 
 **重要CUDA说明:**
@@ -265,7 +265,7 @@ python -c "import torch; print('CUDA可用:', torch.cuda.is_available())"
 
 # 重新安装CUDA支持
 uv tool uninstall ocr-cli
-uv tool install --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match .
+uv tool install --python 3.12 --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match .
 
 # 验证GPU使用(应显示"CUDA可用。使用GPU进行doctr。")
 ocr-search --help  # 检查工具是否可用
