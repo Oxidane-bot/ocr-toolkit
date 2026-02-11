@@ -15,7 +15,7 @@ This value determines how many pages are processed simultaneously.
 Larger values may improve throughput but require more memory.
 """
 
-DEFAULT_WORKERS = 4
+DEFAULT_WORKERS = 1
 """int: Default number of concurrent workers for batch processing."""
 
 # Display and UI constants

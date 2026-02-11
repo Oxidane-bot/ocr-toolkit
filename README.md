@@ -165,7 +165,7 @@ uv run ocr-convert [OPTIONS] INPUT_PATH
 
 Options:
   --output-dir DIR     Output directory (default: markdown_output)
-  --workers N          Concurrent workers (default: 4)
+  --workers N          Concurrent workers (default: 1)
   --list-formats       Show supported formats
   --quiet             Minimal output
   --verbose           Detailed output

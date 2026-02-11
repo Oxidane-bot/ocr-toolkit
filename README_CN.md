@@ -165,7 +165,7 @@ uv run ocr-convert [选项] 输入路径
 
 选项:
   --output-dir DIR     输出目录 (默认: markdown_output)
-  --workers N          并发工作数 (默认: 4)
+  --workers N          并发工作数 (默认: 1)
   --list-formats       显示支持的格式
   --quiet             最小输出
   --verbose           详细输出

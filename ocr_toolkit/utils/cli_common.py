@@ -85,7 +85,7 @@ class BaseArgumentParser:
             parser.add_argument("input_path", nargs="?", help=help)
 
     @staticmethod
-    def add_workers_argument(parser: argparse.ArgumentParser, default: int = 4) -> None:
+    def add_workers_argument(parser: argparse.ArgumentParser, default: int = 1) -> None:
         """
         Add workers argument for concurrent processing.
 

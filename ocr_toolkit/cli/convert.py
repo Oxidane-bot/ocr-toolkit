@@ -114,7 +114,7 @@ Supported formats:
         parser, required=False, help="Path to document file or directory containing documents"
     )
 
-    BaseArgumentParser.add_workers_argument(parser, default=4)
+    BaseArgumentParser.add_workers_argument(parser, default=config.DEFAULT_WORKERS)
 
     parser.add_argument(
         "--list-formats", action="store_true", help="List supported file formats and exit"
