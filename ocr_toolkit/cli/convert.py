@@ -22,8 +22,8 @@ warnings.filterwarnings("ignore", message="invalid value encountered in log10")
 warnings.filterwarnings("ignore", message="invalid value encountered in nextafter")
 
 # Suppress PaddlePaddle/PaddleOCR API warnings
-warnings.filterwarnings("ignore", message="Non compatible API")
-warnings.filterwarnings("ignore", message="To copy construct from a tensor")
+warnings.filterwarnings("ignore", message=r"(?s)\s*Non compatible API\..*")
+warnings.filterwarnings("ignore", message=r"(?s)\s*To copy construct from a tensor.*")
 
 from argparse import Namespace
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -39,12 +39,14 @@ from ..utils import (
     check_input_path_exists,
     configure_logging_level,
     configure_paddle_environment,
+    configure_paddle_warnings,
     discover_files,
     generate_file_tree,
     get_directory_cache,
     get_output_file_path,
     load_ocr_model,
     setup_logging,
+    suppress_external_library_output,
     validate_common_arguments,
 )
 
@@ -173,6 +175,7 @@ def main():
     """Main entry point for ocr-convert command."""
     # Configure PaddlePaddle environment before any imports
     configure_paddle_environment()
+    configure_paddle_warnings()
 
     # Suppress verbose warnings from the pypdf library
     warnings.filterwarnings(
@@ -265,7 +268,8 @@ def main():
         if needs_ocr_model:
             # Verify PaddlePaddle installation
             logging.info("Verifying PaddlePaddle installation...")
-            load_ocr_model(use_cpu=ocr_args.cpu)
+            with suppress_external_library_output():
+                load_ocr_model(use_cpu=ocr_args.cpu)
 
             # Import lazily to avoid pulling in heavy OCR deps on non-OCR workloads.
             from .. import ocr_processor_wrapper

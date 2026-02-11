@@ -16,14 +16,17 @@ import logging
 import os
 import shutil
 import tempfile
-from contextlib import redirect_stderr
-from io import StringIO
 from pathlib import Path
 
 # IMPORTANT: Configure PaddlePaddle environment BEFORE any PaddlePaddle imports
-from ..utils.paddle_config import configure_paddle_environment
+from ..utils.paddle_config import (
+    configure_paddle_environment,
+    configure_paddle_warnings,
+    suppress_external_library_output,
+)
 
 configure_paddle_environment()
+configure_paddle_warnings()
 
 from ..utils.model_loader import setup_nvidia_dll_paths
 from ..utils.profiling import Profiler
@@ -72,9 +75,8 @@ class PaddleOCRVLHandler:
             # Special handling for Windows to find NVIDIA DLLs from pip packages
             setup_nvidia_dll_paths()
 
-            # Suppress noisy PaddleX output by redirecting stderr during initialization
-            stderr_capture = StringIO()
-            with redirect_stderr(stderr_capture):
+            # Suppress noisy Paddle/PaddleX output during initialization
+            with suppress_external_library_output():
                 # Import PaddleOCR
                 import paddle
                 from paddleocr import PaddleOCRVL
@@ -157,6 +159,19 @@ class PaddleOCRVLHandler:
         # Process single document (image or PDF)
         return self._process_single_document(file_path, profiler)
 
+    def _predict_safely(self, file_path: str):
+        """
+        Run PaddleOCR-VL prediction while suppressing framework noise output.
+
+        Args:
+            file_path: Path to file or image to run prediction on
+
+        Returns:
+            Raw prediction output from PaddleOCR-VL pipeline
+        """
+        with suppress_external_library_output():
+            return self.pipeline.predict(file_path)
+
     def _process_single_document(
         self,
         file_path: str,
@@ -174,9 +189,9 @@ class PaddleOCRVLHandler:
         """
         if profiler:
             with profiler.track("paddleocr_vl_predict"):
-                output = self.pipeline.predict(file_path)
+                output = self._predict_safely(file_path)
         else:
-            output = self.pipeline.predict(file_path)
+            output = self._predict_safely(file_path)
 
         return self._extract_output(output, file_path)
 
@@ -233,9 +248,9 @@ class PaddleOCRVLHandler:
             try:
                 if profiler:
                     with profiler.track("paddleocr_vl_predict_page"):
-                        page_output = self.pipeline.predict(temp_image)
+                        page_output = self._predict_safely(temp_image)
                 else:
-                    page_output = self.pipeline.predict(temp_image)
+                    page_output = self._predict_safely(temp_image)
 
                 page_md, _ = self._extract_output(page_output, pdf_path)
 

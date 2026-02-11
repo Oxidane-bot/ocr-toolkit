@@ -24,7 +24,11 @@ from .file_discovery import (
     is_supported_file,
 )
 from .file_tree_display import generate_file_tree
-from .paddle_config import configure_paddle_environment
+from .paddle_config import (
+    configure_paddle_environment,
+    configure_paddle_warnings,
+    suppress_external_library_output,
+)
 from .path_normalizer import PathNormalizer, get_path_normalizer, normalize_file_path
 from .temp_file_manager import TempFileManager, cleanup_temp_files, get_temp_manager
 
@@ -67,4 +71,6 @@ __all__ = [
     "check_input_path_exists",
     "print_processing_summary",
     "configure_paddle_environment",
+    "configure_paddle_warnings",
+    "suppress_external_library_output",
 ]

@@ -13,6 +13,8 @@ import os
 import sys
 from typing import Any
 
+from .paddle_config import configure_paddle_warnings, suppress_external_library_output
+
 
 def setup_nvidia_dll_paths():
     """
@@ -95,9 +97,11 @@ def load_ocr_model(use_cpu: bool = False):
     """
     # Setup NVIDIA DLL paths on Windows before importing paddle
     setup_nvidia_dll_paths()
+    configure_paddle_warnings()
 
     try:
-        import paddle
+        with suppress_external_library_output():
+            import paddle
 
         # Verify PaddlePaddle version
         paddle_version = getattr(paddle, "__version__", "unknown")
@@ -128,13 +132,15 @@ def load_ocr_model(use_cpu: bool = False):
 
         # Verify PaddleOCR 3.x is available
         try:
-            import paddleocr
+            with suppress_external_library_output():
+                import paddleocr
 
             ocr_version = getattr(paddleocr, "__version__", "unknown")
             logging.info(f"PaddleOCR version: {ocr_version}")
 
             # Check for PaddleOCRVL class (PaddleOCR 3.x feature)
-            from paddleocr import PaddleOCR
+            with suppress_external_library_output():
+                from paddleocr import PaddleOCR
 
             logging.info("PaddleOCR 3.x is available")
         except ImportError as e:
@@ -169,9 +175,11 @@ def get_device_info() -> dict[str, Any]:
 
     # Setup NVIDIA DLL paths on Windows before importing paddle
     setup_nvidia_dll_paths()
+    configure_paddle_warnings()
 
     try:
-        import paddle
+        with suppress_external_library_output():
+            import paddle
 
         device_info["paddle_available"] = True
         device_info["paddle_version"] = getattr(paddle, "__version__", "unknown")

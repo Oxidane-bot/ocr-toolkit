@@ -7,7 +7,13 @@ import logging
 import os
 import sys
 
-from ..utils import add_common_ocr_args, configure_logging_level, discover_pdf_files
+from ..utils import (
+    add_common_ocr_args,
+    configure_logging_level,
+    configure_paddle_environment,
+    configure_paddle_warnings,
+    discover_pdf_files,
+)
 
 
 def setup_logging():
@@ -59,6 +65,8 @@ warnings.filterwarnings("ignore", message="invalid value encountered in nextafte
 
 def main():
     """Main entry point for ocr-bench command."""
+    configure_paddle_environment()
+    configure_paddle_warnings()
     setup_logging()
     parser = create_parser()
     args = parser.parse_args()
