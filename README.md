@@ -56,14 +56,8 @@ Convert documents to Markdown instantly with MarkItDown technology and OCR fallb
 # Install with uv (recommended)
 uv pip install .
 
-# Optional: enable searchable PDF creation (ocr-search)
-uv pip install ".[search]"
-
 # Or with pip
 pip install .
-
-# Optional: enable searchable PDF creation (ocr-search)
-pip install ".[search]"
 ```
 
 ### Global Tool Installation
@@ -106,11 +100,14 @@ uv run ocr-convert --list-formats
 ### OCR for Scanned Documents
 
 ```bash
-# Extract text from scanned PDFs
-uv run ocr-extract scanned_document.pdf
+# OCR for scanned PDFs/images (default uses GPU when available)
+uv run ocr-convert scanned_document.pdf
 
-# Create searchable PDFs (requires: uv pip install ".[search]")
-uv run ocr-search input.pdf searchable_output.pdf
+# Force CPU mode
+uv run ocr-convert scanned_document.pdf --cpu
+
+# Process only selected pages and print timing breakdown
+uv run ocr-convert scanned_document.pdf --pages 1-10 --profile
 ```
 
 ### Performance Testing
@@ -145,59 +142,36 @@ uv run ocr-convert mixed_docs/ --verbose
 
 ### Handle Scanned Documents
 ```bash
-# Try MarkItDown first, fallback to OCR if needed
-uv run ocr-convert scanned_file.pdf || uv run ocr-extract scanned_file.pdf
+# Run OCR conversion directly and limit pages for faster iteration
+uv run ocr-convert scanned_file.pdf --pages 1-30
 ```
 
-### Create Searchable Archive
+### Benchmark OCR Workloads
 ```bash
-uv run ocr-search scanned_archive/ 
+uv run ocr-bench scanned_archive/ --file-limit 20
 ```
 
 ## 🔧 Command Reference
 
 ### `ocr-convert` - Main Document Converter
 
-Convert any supported document to Markdown using MarkItDown.
+Convert supported documents to Markdown (including OCR-backed formats).
 
 ```bash
 uv run ocr-convert [OPTIONS] INPUT_PATH
 
 Options:
-  --output-dir DIR     Output directory (default: markdown_output)
   --workers N          Concurrent workers (default: 1)
   --list-formats       Show supported formats
+  --output-dir DIR     Output directory
+  --preserve-structure Preserve input folder structure
+  --no-recursive       Only process top-level files in a directory
+  --with-images        Keep extracted image links in markdown
   --quiet             Minimal output
   --verbose           Detailed output
-```
-
-### `ocr-extract` - OCR Text Extraction
-
-Extract text from PDFs using OCR (for scanned documents).
-
-```bash
-uv run ocr-extract [OPTIONS] PDF_PATH
-
-Options:
-  --output-dir DIR     Output directory
-  --batch_size N       OCR batch size (default: 1)
   --cpu               Force CPU processing
-  --det-arch ARCH     Detection model
-  --reco-arch ARCH    Recognition model
-```
-
-### `ocr-search` - Searchable PDF Creation
-
-Convert scanned PDFs to searchable format.
-Requires installing optional searchable-PDF dependencies: `uv pip install ".[search]"`.
-
-```bash
-uv run ocr-search [OPTIONS] INPUT_PDF [OUTPUT_PDF]
-
-Options:
-  -O LEVEL            Optimization level (0-3)
-  --batch_size N      OCR batch size (default: 1)
-  --cpu              Force CPU processing
+  --pages RANGE       Process selected pages (e.g. 1-5,10)
+  --profile           Print fine-grained timing
 ```
 
 ### `ocr-bench` - Performance Benchmarking
@@ -205,12 +179,15 @@ Options:
 Test processing speed on your documents.
 
 ```bash
-uv run ocr-bench [OPTIONS] DIRECTORY
+uv run ocr-bench [OPTIONS] INPUT_PATH
 
 Options:
   --workers N         Parallel workers
   --file-limit N      Limit files to process
   --timeout N         Timeout per file (seconds)
+  --cpu               Force CPU processing
+  --pages RANGE       Process selected pages (e.g. 1-5,10)
+  --profile           Print fine-grained timing
   --verbose          Detailed output
 ```
 
@@ -244,11 +221,11 @@ uv run ocr-convert --list-formats
 
 **OCR out of memory**:
 ```bash
-# Reduce batch size
-uv run ocr-extract --batch_size 1 document.pdf
-
 # Use CPU processing
-uv run ocr-extract --cpu document.pdf
+uv run ocr-convert --cpu document.pdf
+
+# Process fewer pages per run
+uv run ocr-convert document.pdf --pages 1-10
 ```
 
 **Slow processing**:
@@ -261,24 +238,15 @@ uv run ocr-convert documents/ --workers 8
 
 **CUDA not detected (OCR using CPU)**:
 ```bash
-# Check if CUDA is available
-python -c "import torch; print('CUDA available:', torch.cuda.is_available())"
+# Check Paddle CUDA support
+uv run python -c "import paddle; print('CUDA compiled:', paddle.is_compiled_with_cuda()); print('GPU count:', paddle.device.cuda.device_count() if paddle.is_compiled_with_cuda() else 0)"
 
 # Reinstall with CUDA support
 uv tool uninstall ocr-cli
 uv tool install --python 3.12 --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match .
 
-# Verify GPU usage (should show "CUDA is available. Using GPU for doctr.")
-ocr-search --help  # Check if tools are available
-```
-
-**`ocr-search` dependency not installed**:
-```bash
-# Install searchable PDF support
-uv pip install ".[search]"
-
-# Or
-pip install "ocr-cli[search]"
+# Verify command availability
+uv run ocr-convert --help
 ```
 
 ## 📈 When to Use Each Tool
@@ -287,9 +255,9 @@ pip install "ocr-cli[search]"
 |---------------|------------------|-----|
 | **Office docs** (DOCX, PPTX) | `ocr-convert` | Perfect format preservation |
 | **Text PDFs** | `ocr-convert` | Fast and accurate |
-| **Scanned PDFs** | `ocr-extract` | OCR handles images |
+| **Scanned PDFs** | `ocr-convert` | OCR handles images |
 | **Mixed batch** | `ocr-convert` | Try fastest method first |
-| **Searchable PDFs** | `ocr-search` | Specialized for this task |
+| **Performance testing** | `ocr-bench` | Compare throughput and runtime |
 
 ## 🏗️ Architecture & Development
 
@@ -352,23 +320,17 @@ uv run --with pypdf scripts/slice_pdf_first_pages.py "INPUT.pdf" "OUTPUT_firstN.
 - Then run OCR on the sliced file, e.g.:
 
 ```bash
-ocr-extract "OUTPUT_firstN.pdf" --zh --verbose
+uv run ocr-convert "OUTPUT_firstN.pdf" --verbose
 ```
 
-## Performance tips and new flags
+## Useful OCR Flags
 
-For faster runs on Chinese documents (CnOCR `--zh`):
-
-- `--fast`: Enable a faster pipeline (naive detection + optional downscale). Good for clean scans.
-- `--threads N`: Set OMP/MKL thread count for CPU-bound parts.
-- `--pages RANGE`: Process only selected pages. Examples: `--pages 1-30`, `--pages 1-5,10,20-25`.
+- `--cpu`: Force CPU inference instead of GPU.
+- `--pages RANGE`: Process selected pages only. Examples: `--pages 1-30`, `--pages 1-5,10,20-25`.
+- `--profile`: Print timing breakdown for startup/load/predict stages.
 
 Example:
 
 ```bash
-ocr-extract "主体解释学_first30.pdf" --zh --ocr-only --fast --threads 8 --batch-size 32 --pages 1-30
+uv run ocr-convert "主体解释学_first30.pdf" --pages 1-30 --profile
 ```
-
-Notes:
-- `--fast` may trade some layout robustness for speed.
-- `--threads` affects CPU parts and may not change GPU inference speed.

@@ -55,14 +55,8 @@
 # 使用 uv 安装 (推荐)
 uv pip install .
 
-# Optional: enable searchable PDF creation (ocr-search)
-uv pip install ".[search]"
-
 # 或使用 pip
 pip install .
-
-# Optional: enable searchable PDF creation (ocr-search)
-pip install ".[search]"
 ```
 
 ### 全局工具安装
@@ -105,12 +99,14 @@ uv run ocr-convert --list-formats
 ### 扫描文档OCR
 
 ```bash
-# 从扫描PDF提取文字
-uv run ocr-extract scanned_document.pdf
+# 扫描PDF/图片走OCR (默认有GPU时使用GPU)
+uv run ocr-convert scanned_document.pdf
 
-# 创建可搜索PDF
-uv run ocr-search input.pdf searchable_output.pdf
-# (Requires: uv pip install ".[search]" or pip install "ocr-cli[search]")
+# 强制使用CPU
+uv run ocr-convert scanned_document.pdf --cpu
+
+# 只处理部分页面并输出耗时明细
+uv run ocr-convert scanned_document.pdf --pages 1-10 --profile
 ```
 
 ### 性能测试
@@ -145,58 +141,36 @@ uv run ocr-convert mixed_docs/ --verbose
 
 ### 处理扫描文档
 ```bash
-# 首先尝试MarkItDown，需要时回退到OCR
-uv run ocr-convert scanned_file.pdf || uv run ocr-extract scanned_file.pdf
+# 直接做OCR转换，并限制页数以便快速迭代
+uv run ocr-convert scanned_file.pdf --pages 1-30
 ```
 
-### 创建可搜索档案
+### OCR负载基准测试
 ```bash
-uv run ocr-search scanned_archive/
+uv run ocr-bench scanned_archive/ --file-limit 20
 ```
 
 ## 🔧 命令参考
 
 ### `ocr-convert` - 主要文档转换器
 
-使用MarkItDown将任何支持的文档转换为Markdown。
+将支持的文档转换为Markdown（含OCR处理流程）。
 
 ```bash
 uv run ocr-convert [选项] 输入路径
 
 选项:
-  --output-dir DIR     输出目录 (默认: markdown_output)
   --workers N          并发工作数 (默认: 1)
   --list-formats       显示支持的格式
+  --output-dir DIR     输出目录
+  --preserve-structure 保留输入目录层级
+  --no-recursive       目录模式仅处理顶层文件
+  --with-images        保留图片并在Markdown中写入图片链接
   --quiet             最小输出
   --verbose           详细输出
-```
-
-### `ocr-extract` - OCR文字提取
-
-使用OCR从PDF中提取文字(用于扫描文档)。
-
-```bash
-uv run ocr-extract [选项] PDF路径
-
-选项:
-  --output-dir DIR     输出目录
-  --batch_size N       OCR批处理大小 (默认: 1)
   --cpu               强制CPU处理
-  --det-arch ARCH     检测模型
-  --reco-arch ARCH    识别模型
-```
-
-### `ocr-search` - 可搜索PDF创建
-
-将扫描PDF转换为可搜索格式。
-
-```bash
-uv run ocr-search [选项] 输入PDF [输出PDF]
-
-选项:
-  -O LEVEL            优化级别 (0-3)
-  --batch_size N      OCR批处理大小
-  --cpu              强制CPU处理
+  --pages RANGE       仅处理指定页 (如 1-5,10)
+  --profile           打印细粒度耗时
 ```
 
 ### `ocr-bench` - 性能基准测试
@@ -204,12 +178,15 @@ uv run ocr-search [选项] 输入PDF [输出PDF]
 测试文档处理速度。
 
 ```bash
-uv run ocr-bench [选项] 目录
+uv run ocr-bench [选项] 输入路径
 
 选项:
   --workers N         并行工作数
   --file-limit N      限制处理文件数
   --timeout N         单文件超时(秒)
+  --cpu               强制CPU处理
+  --pages RANGE       仅处理指定页 (如 1-5,10)
+  --profile           打印细粒度耗时
   --verbose          详细输出
 ```
 
@@ -243,11 +220,11 @@ uv run ocr-convert --list-formats
 
 **OCR内存不足**:
 ```bash
-# 减少批处理大小
-uv run ocr-extract --batch_size 1 document.pdf
-
 # 使用CPU处理
-uv run ocr-extract --cpu document.pdf
+uv run ocr-convert --cpu document.pdf
+
+# 单次处理更少页面
+uv run ocr-convert document.pdf --pages 1-10
 ```
 
 **处理缓慢**:
@@ -260,27 +237,15 @@ uv run ocr-convert documents/ --workers 8
 
 **CUDA未检测到(OCR使用CPU)**:
 ```bash
-# 检查CUDA是否可用
-python -c "import torch; print('CUDA可用:', torch.cuda.is_available())"
+# 检查 Paddle CUDA 支持
+uv run python -c "import paddle; print('CUDA编译支持:', paddle.is_compiled_with_cuda()); print('GPU数量:', paddle.device.cuda.device_count() if paddle.is_compiled_with_cuda() else 0)"
 
 # 重新安装CUDA支持
 uv tool uninstall ocr-cli
 uv tool install --python 3.12 --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match .
 
-# 验证GPU使用(应显示"CUDA可用。使用GPU进行doctr。")
-ocr-search --help  # 检查工具是否可用
-```
-
-**JBIG2压缩错误**:
-```bash
-# 使用--no-jbig2避免JBIG2依赖问题
-ocr-search --no-jbig2 document.pdf
-
-# 或完全禁用优化
-ocr-search --optimize 0 document.pdf
-
-# 批处理
-ocr-search --no-jbig2 documents/
+# 验证命令可用性
+uv run ocr-convert --help
 ```
 
 ## 📈 何时使用各工具
@@ -289,9 +254,9 @@ ocr-search --no-jbig2 documents/
 |----------|----------|------|
 | **Office文档** (DOCX, PPTX) | `ocr-convert` | 完美格式保留 |
 | **文字PDF** | `ocr-convert` | 快速准确 |
-| **扫描PDF** | `ocr-extract` | OCR处理图像 |
+| **扫描PDF** | `ocr-convert` | OCR处理图像 |
 | **混合批次** | `ocr-convert` | 首先尝试最快方法 |
-| **可搜索PDF** | `ocr-search` | 专门为此任务设计 |
+| **性能测试** | `ocr-bench` | 对比吞吐与耗时 |
 
 ## 🏗️ 架构与开发
 

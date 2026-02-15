@@ -81,21 +81,24 @@ class PaddleOCRVLHandler:
                 import paddle
                 from paddleocr import PaddleOCRVL
 
-                # Set device based on use_gpu parameter
+                # Set device based on use_gpu parameter and pass it explicitly to PaddleOCRVL.
+                # PaddleOCRVL may auto-select GPU when device is omitted, so we must always
+                # provide the intended device to make --cpu effective.
                 if self.use_gpu:
                     try:
                         paddle.set_device("gpu")
+                        self.pipeline = PaddleOCRVL(device="gpu:0")
                         self.logger.info("Using GPU for PaddleOCR-VL")
                     except Exception as e:
-                        self.logger.warning(f"Failed to set GPU device: {e}. Falling back to CPU.")
+                        self.logger.warning(f"Failed to use GPU device: {e}. Falling back to CPU.")
                         paddle.set_device("cpu")
+                        self.pipeline = PaddleOCRVL(device="cpu")
                         self.use_gpu = False
+                        self.logger.info("Using CPU for PaddleOCR-VL")
                 else:
                     paddle.set_device("cpu")
+                    self.pipeline = PaddleOCRVL(device="cpu")
                     self.logger.info("Using CPU for PaddleOCR-VL")
-
-                # Initialize the pipeline with device configuration
-                self.pipeline = PaddleOCRVL()
 
             self.initialized = True
             self.logger.info("PaddleOCR-VL initialized successfully")
