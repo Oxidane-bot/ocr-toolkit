@@ -34,9 +34,9 @@ class TestOCRProcessorWrapper:
 
     def test_init_default_params(self):
         """Test OCRProcessorWrapper initialization with default parameters."""
-        # Mock the PaddleOCRVLHandler to avoid actual model loading
+        # Mock the OpenOCRDocHandler to avoid actual model loading
         with patch(
-            "ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler"
+            "ocr_toolkit.processors.openocr_doc_handler.OpenOCRDocHandler"
         ) as mock_handler_class:
             mock_instance = Mock()
             mock_instance.is_available.return_value = True
@@ -51,7 +51,7 @@ class TestOCRProcessorWrapper:
     def test_init_with_cpu(self):
         """Test OCRProcessorWrapper initialization with CPU mode."""
         with patch(
-            "ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler"
+            "ocr_toolkit.processors.openocr_doc_handler.OpenOCRDocHandler"
         ) as mock_handler_class:
             mock_instance = Mock()
             mock_instance.is_available.return_value = True
@@ -64,7 +64,7 @@ class TestOCRProcessorWrapper:
     def test_init_with_images(self):
         """Test OCRProcessorWrapper initialization with image extraction."""
         with patch(
-            "ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler"
+            "ocr_toolkit.processors.openocr_doc_handler.OpenOCRDocHandler"
         ) as mock_handler_class:
             mock_instance = Mock()
             mock_instance.is_available.return_value = True
@@ -77,7 +77,7 @@ class TestOCRProcessorWrapper:
     def test_init_with_cpu_and_images(self):
         """Test OCRProcessorWrapper initialization with CPU and image extraction."""
         with patch(
-            "ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler"
+            "ocr_toolkit.processors.openocr_doc_handler.OpenOCRDocHandler"
         ) as mock_handler_class:
             mock_instance = Mock()
             mock_instance.is_available.return_value = True
@@ -91,7 +91,7 @@ class TestOCRProcessorWrapper:
     def test_process_document_success(self):
         """Test successful document processing."""
         with patch(
-            "ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler"
+            "ocr_toolkit.processors.openocr_doc_handler.OpenOCRDocHandler"
         ) as mock_handler_class:
             # Setup mock handler
             mock_instance = Mock()
@@ -116,7 +116,7 @@ class TestOCRProcessorWrapper:
 
             assert result["success"] is True
             assert result["file_path"] == test_file
-            assert result["chosen_method"] == "paddleocr_vl"
+            assert result["chosen_method"] == "openocr_doc"
             assert "Test Content" in result["final_content"]
             assert result["processing_time"] >= 0
             assert result["ocr_result"]["success"] is True
@@ -124,7 +124,7 @@ class TestOCRProcessorWrapper:
     def test_process_document_with_pages(self):
         """Test document processing with page selection."""
         with patch(
-            "ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler"
+            "ocr_toolkit.processors.openocr_doc_handler.OpenOCRDocHandler"
         ) as mock_handler_class:
             # Setup mock handler
             mock_instance = Mock()
@@ -156,7 +156,7 @@ class TestOCRProcessorWrapper:
     def test_process_document_with_profile(self):
         """Test document processing with profiling enabled."""
         with patch(
-            "ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler"
+            "ocr_toolkit.processors.openocr_doc_handler.OpenOCRDocHandler"
         ) as mock_handler_class:
             # Setup mock handler
             mock_instance = Mock()
@@ -185,7 +185,7 @@ class TestOCRProcessorWrapper:
     def test_process_document_handler_not_available(self):
         """Test document processing when handler is not available."""
         with patch(
-            "ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler"
+            "ocr_toolkit.processors.openocr_doc_handler.OpenOCRDocHandler"
         ) as mock_handler_class:
             # Setup mock handler to raise exception
             mock_instance = Mock()
@@ -212,7 +212,7 @@ class TestOCRProcessorWrapper:
     def test_get_statistics(self):
         """Test getting basic statistics."""
         with patch(
-            "ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler"
+            "ocr_toolkit.processors.openocr_doc_handler.OpenOCRDocHandler"
         ) as mock_handler_class:
             mock_instance = Mock()
             mock_instance.is_available.return_value = True
@@ -228,7 +228,7 @@ class TestOCRProcessorWrapper:
     def test_get_detailed_statistics(self):
         """Test getting detailed statistics."""
         with patch(
-            "ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler"
+            "ocr_toolkit.processors.openocr_doc_handler.OpenOCRDocHandler"
         ) as mock_handler_class:
             mock_instance = Mock()
             mock_instance.is_available.return_value = True
@@ -247,7 +247,7 @@ class TestCreateOCRProcessorWrapper:
     def test_create_ocr_processor_wrapper_default(self):
         """Test creating wrapper with default parameters."""
         with patch(
-            "ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler"
+            "ocr_toolkit.processors.openocr_doc_handler.OpenOCRDocHandler"
         ) as mock_handler_class:
             mock_instance = Mock()
             mock_instance.is_available.return_value = True
@@ -261,7 +261,7 @@ class TestCreateOCRProcessorWrapper:
     def test_create_ocr_processor_wrapper_with_cpu(self):
         """Test creating wrapper with CPU mode."""
         with patch(
-            "ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler"
+            "ocr_toolkit.processors.openocr_doc_handler.OpenOCRDocHandler"
         ) as mock_handler_class:
             mock_instance = Mock()
             mock_instance.is_available.return_value = True
@@ -274,7 +274,7 @@ class TestCreateOCRProcessorWrapper:
     def test_create_ocr_processor_wrapper_with_images(self):
         """Test creating wrapper with image extraction."""
         with patch(
-            "ocr_toolkit.processors.paddleocr_vl_handler.PaddleOCRVLHandler"
+            "ocr_toolkit.processors.openocr_doc_handler.OpenOCRDocHandler"
         ) as mock_handler_class:
             mock_instance = Mock()
             mock_instance.is_available.return_value = True

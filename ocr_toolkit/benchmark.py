@@ -2,7 +2,7 @@
 Benchmark runner for OCR performance.
 
 This module backs the `ocr-bench` CLI. It intentionally focuses on measuring
-end-to-end OCR processing time for a batch of PDF files using PaddleOCR-VL.
+end-to-end OCR processing time for a batch of PDF files using OpenOCR/OpenDoc.
 """
 
 from __future__ import annotations
@@ -10,10 +10,11 @@ from __future__ import annotations
 import logging
 import os
 import time
+from argparse import Namespace
 from dataclasses import dataclass
 from typing import Any
 
-from .processors import OCRProcessor
+from .ocr_processor_wrapper import OCRProcessorWrapper, create_ocr_processor_wrapper
 
 
 def _apply_threads_env(threads: int | None) -> None:
@@ -32,9 +33,9 @@ class _BenchConfig:
     threads: int | None
 
 
-def _create_processor(cfg: _BenchConfig) -> OCRProcessor:
+def _create_processor(cfg: _BenchConfig) -> OCRProcessorWrapper:
     use_gpu = not cfg.use_cpu
-    return OCRProcessor(batch_size=cfg.batch_size, use_gpu=use_gpu)
+    return create_ocr_processor_wrapper(use_gpu=use_gpu, with_images=False)
 
 
 def run_benchmark(
@@ -87,9 +88,8 @@ def run_benchmark(
         logging.info(f"[{idx}/{len(pdf_files)}] Benchmarking: {os.path.basename(file_path)}")
         start = time.perf_counter()
         try:
-            result = processor.process(
-                file_path, fast=cfg.fast, pages=cfg.pages, profile=cfg.profile
-            )
+            cli_args = Namespace(pages=cfg.pages, profile=cfg.profile, _output_dir=None)
+            result = processor.process_document(file_path, args=cli_args)
             elapsed = time.perf_counter() - start
             processing_times.append(elapsed)
 
@@ -98,10 +98,10 @@ def run_benchmark(
                 logging.warning(f"Timed out (> {timeout}s): {file_path}")
                 continue
 
-            if result.success:
+            if result.get("success"):
                 successful_files += 1
                 if cfg.profile:
-                    prof = result.metadata.get("profile")
+                    prof = result.get("ocr_result", {}).get("metadata", {}).get("profile")
                     if isinstance(prof, dict) and prof:
                         logging.info("  -> Profile breakdown:")
                         for name, data in sorted(
@@ -114,7 +114,7 @@ def run_benchmark(
                             logging.info(f"     - {name}: {total_s:.3f}s (n={count})")
             else:
                 failed_files += 1
-                logging.warning(f"Failed: {file_path} - {result.error}")
+                logging.warning(f"Failed: {file_path} - {result.get('error', 'Unknown error')}")
         except Exception as e:
             elapsed = time.perf_counter() - start
             processing_times.append(elapsed)

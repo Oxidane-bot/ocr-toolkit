@@ -3,8 +3,6 @@ Configuration module for OCR toolkit.
 
 This module contains default configuration values used across the OCR toolkit,
 including processing parameters, output directories, and supported file formats.
-
-For PaddleOCR-VL, models are managed internally by the library.
 """
 
 # Default processing parameters

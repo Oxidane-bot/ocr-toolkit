@@ -2,7 +2,7 @@
 
 **语言**: [中文版](README_CN.md) | [English](README.md)
 
-使用MarkItDown技术和OCR后备支持，即时将文档转换为Markdown。
+使用 MarkItDown 与 OpenOCR（OpenDoc-0.1B）后备能力，即时将文档转换为 Markdown。
 
 ## 🚀 功能特点
 
@@ -67,7 +67,7 @@ uv tool install --python 3.12 .
 
 # GPU/CUDA版本 (推荐，更快的OCR性能)
 # 需要CUDA 11.8+和兼容的NVIDIA驱动
-uv tool install --python 3.12 --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match .
+uv tool install --python 3.12 .
 ```
 
 **重要CUDA说明:**
@@ -237,12 +237,12 @@ uv run ocr-convert documents/ --workers 8
 
 **CUDA未检测到(OCR使用CPU)**:
 ```bash
-# 检查 Paddle CUDA 支持
-uv run python -c "import paddle; print('CUDA编译支持:', paddle.is_compiled_with_cuda()); print('GPU数量:', paddle.device.cuda.device_count() if paddle.is_compiled_with_cuda() else 0)"
+# 检查 ONNX Runtime Provider（需要 CUDAExecutionProvider）
+uv run python -c "import onnxruntime as ort; print('providers:', ort.get_available_providers())"
 
 # 重新安装CUDA支持
 uv tool uninstall ocr-cli
-uv tool install --python 3.12 --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match .
+uv tool install --python 3.12 .
 
 # 验证命令可用性
 uv run ocr-convert --help

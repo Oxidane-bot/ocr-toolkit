@@ -24,18 +24,16 @@ dependencies = [
     "docx2pdf>=0.1.8",
     "pywin32>=311; sys_platform == 'win32'",
     "openpyxl>=3.1.5",
-    # PaddlePaddle GPU 3.2.1 (from PaddlePaddle official index)
-    "paddlepaddle-gpu==3.2.1; sys_platform == 'win32'",
-    # NVIDIA CUDA/cuDNN runtimes for GPU acceleration (managed by uv)
+    # OpenOCR runtime and GPU backend
+    "openocr-python[onnx-gpu]>=0.1.5",
+    # NVIDIA CUDA/cuDNN runtimes for GPU acceleration on Windows
     "nvidia-cudnn-cu12>=9.0.0; sys_platform == 'win32'",
     "nvidia-cublas-cu12>=12.0.0; sys_platform == 'win32'",
     "nvidia-cuda-runtime-cu12>=12.0.0; sys_platform == 'win32'",
-    # PaddleOCR 3.x for OCR processing
-    "paddleocr[doc-parser]>=3.0.0",
     "opencv-python",
     "pdf2image",
     "pypdfium2>=4.30.0",
-    # Use NumPy 1.26.4 to ensure compatibility with PaddleOCR scalar conversions
+    # Use NumPy 1.26.4 for stable OCR/runtime compatibility
     "numpy>=1.26.4,<2.0.0",
     "scikit-image",
     # Core utilities
@@ -70,15 +68,6 @@ Issues = "https://github.com/USER/ocr-toolkit/issues"
 [tool.uv]
 # NumPy 2.0 resolves MINGW-W64 Windows build issues
 index-strategy = "unsafe-best-match"
-
-# Pin PaddlePaddle to official index (all other packages use PyPI)
-[tool.uv.sources]
-paddlepaddle-gpu = { index = "paddle" }
-
-[[tool.uv.index]]
-name = "paddle"
-url = "https://www.paddlepaddle.org.cn/packages/stable/cu129/"
-explicit = true
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
@@ -137,14 +126,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["N802", "N803", "E712", "E722", "E741", "SIM102", "SIM105", "B007", "W291", "W293"]  # Test file allowances
-# E402: Module level import not at top of file - needed for PaddlePaddle environment setup
+# E402: Module level import not at top of file
 "ocr_toolkit/cli/benchmark.py" = ["E402"]
 "ocr_toolkit/cli/convert.py" = ["E402"]
-"ocr_toolkit/processors/paddleocr_vl_handler.py" = ["E402"]
-# F401: Import for availability check
-"ocr_toolkit/utils/model_loader.py" = ["F401"]
-# F841: Unused variable from old API compatibility
-"ocr_toolkit/processors/ocr_processor.py" = ["F841"]
 # E402: Test imports
 "tests/integration/test_preserve_structure_integration.py" = ["E402"]
 

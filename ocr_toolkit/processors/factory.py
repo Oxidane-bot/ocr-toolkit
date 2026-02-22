@@ -28,9 +28,9 @@ class ProcessorFactory:
     def _register_ocr_processor(self) -> None:
         """Register the OCR processor class."""
         try:
-            from .ocr_processor import OCRProcessor
+            from ..ocr_processor_wrapper import OCRProcessorWrapper
 
-            self._ocr_processor_class = OCRProcessor
+            self._ocr_processor_class = OCRProcessorWrapper
             self.logger.debug("Registered OCR processor")
         except ImportError as e:
             self.logger.error(f"Could not register OCR processor: {e}")

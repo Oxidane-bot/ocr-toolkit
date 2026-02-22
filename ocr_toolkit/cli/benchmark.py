@@ -10,8 +10,8 @@ import sys
 from ..utils import (
     add_common_ocr_args,
     configure_logging_level,
-    configure_paddle_environment,
-    configure_paddle_warnings,
+    configure_ocr_environment,
+    configure_ocr_warnings,
     discover_pdf_files,
 )
 
@@ -65,8 +65,8 @@ warnings.filterwarnings("ignore", message="invalid value encountered in nextafte
 
 def main():
     """Main entry point for ocr-bench command."""
-    configure_paddle_environment()
-    configure_paddle_warnings()
+    configure_ocr_environment()
+    configure_ocr_warnings()
     setup_logging()
     parser = create_parser()
     args = parser.parse_args()
@@ -78,6 +78,8 @@ def main():
         if getattr(args, "threads", None):
             os.environ["OMP_NUM_THREADS"] = str(args.threads)
             os.environ["MKL_NUM_THREADS"] = str(args.threads)
+
+        batch_size = getattr(args, "batch_size", 1)
 
         # Import benchmark module
         from .. import benchmark
@@ -94,7 +96,7 @@ def main():
             logging.info(f"Limited to first {len(pdf_files)} files")
 
         logging.info("Starting OCR benchmark...")
-        logging.info(f"Batch size: {args.batch_size}")
+        logging.info(f"Batch size: {batch_size}")
         logging.info(f"Workers: {args.workers}")
         logging.info(f"Using {'GPU' if not args.cpu else 'CPU'}")
         logging.info(f"Found {len(pdf_files)} PDF files to process")
@@ -102,7 +104,7 @@ def main():
         # Run benchmark
         results = benchmark.run_benchmark(
             pdf_files=pdf_files,
-            batch_size=args.batch_size,
+            batch_size=batch_size,
             workers=args.workers,
             use_cpu=args.cpu,
             timeout=args.timeout,

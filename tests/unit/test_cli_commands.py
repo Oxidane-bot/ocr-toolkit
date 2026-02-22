@@ -24,7 +24,7 @@ class TestCLICommands:
 
     def teardown_method(self):
         """Cleanup after each test method."""
-        # Use pathlib instead of os.path.exists to avoid PaddleOCR os module override
+        # Use pathlib for robust cleanup across OCR runtime dependencies
         import pathlib
 
         test_dir_path = pathlib.Path(self.test_dir)
@@ -78,4 +78,4 @@ class TestCLICommands:
             assert e.code == 0
 
     # Tests for extract and search commands are removed as those modules don't exist
-    # TODO: Add tests for new paddleocr_vl engine functionality
+    # TODO: Add tests for new openocr doc engine functionality

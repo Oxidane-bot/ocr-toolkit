@@ -2,7 +2,7 @@
 Document loader for OCR processing.
 
 This module provides a high-cohesion loader for Office document conversion.
-PaddleOCR-VL handles PDF and image loading directly, so this loader focuses
+OpenOCR handles PDF and image loading directly, so this loader focuses
 on Office document to PDF conversion.
 """
 
@@ -17,10 +17,10 @@ class DocumentLoader:
     Handler for loading documents of various formats.
 
     This class encapsulates Office document to PDF conversion.
-    PaddleOCR-VL handles PDF and image loading directly.
+    OpenOCR handles PDF and image loading directly.
 
     Note: This is kept for Office document conversion only.
-    PDF and image formats are handled directly by PaddleOCR-VL.
+    PDF and image formats are handled directly by OpenOCR.
     """
 
     # Supported formats grouped by type

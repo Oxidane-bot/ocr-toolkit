@@ -2,7 +2,7 @@
 
 **Language**: [English](README.md) | [中文版](README_CN.md)
 
-Convert documents to Markdown instantly with MarkItDown technology and OCR fallback support.
+Convert documents to Markdown instantly with MarkItDown and OpenOCR (OpenDoc-0.1B) fallback.
 
 ## 🚀 Features
 
@@ -68,7 +68,7 @@ uv tool install --python 3.12 .
 
 # GPU/CUDA version (recommended for better OCR performance)
 # Requires CUDA 11.8+ and compatible NVIDIA drivers
-uv tool install --python 3.12 --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match .
+uv tool install --python 3.12 .
 ```
 
 **Important CUDA Notes:**
@@ -238,12 +238,12 @@ uv run ocr-convert documents/ --workers 8
 
 **CUDA not detected (OCR using CPU)**:
 ```bash
-# Check Paddle CUDA support
-uv run python -c "import paddle; print('CUDA compiled:', paddle.is_compiled_with_cuda()); print('GPU count:', paddle.device.cuda.device_count() if paddle.is_compiled_with_cuda() else 0)"
+# Check ONNX Runtime providers (need CUDAExecutionProvider)
+uv run python -c "import onnxruntime as ort; print('providers:', ort.get_available_providers())"
 
 # Reinstall with CUDA support
 uv tool uninstall ocr-cli
-uv tool install --python 3.12 --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match .
+uv tool install --python 3.12 .
 
 # Verify command availability
 uv run ocr-convert --help
@@ -278,12 +278,13 @@ ocr_toolkit/
 ├── processors/          # Core processing engines
 │   ├── base.py         # Abstract interfaces & ProcessingResult
 │   ├── factory.py      # ProcessorFactory for processor management
-│   ├── ocr_processor.py    # OCR processing with CnOCR support
-│   └── markitdown_processor.py  # MarkItDown processing
+│   ├── openocr_doc_handler.py   # OpenOCR/OpenDoc integration
+│   └── text_file_processor.py   # Text file processing
 ├── utils/              # Service layer & utilities
 │   ├── temp_file_manager.py    # Centralized temp file management
 │   ├── path_normalizer.py      # Path normalization service
-│   ├── model_loader.py         # OCR model loading utilities
+│   ├── model_loader.py         # OpenOCR runtime checks
+│   ├── runtime_config.py       # OCR runtime noise suppression
 │   ├── file_discovery.py       # File discovery & validation
 │   └── cli_args.py            # CLI argument utilities
 ├── converters/         # File format converters

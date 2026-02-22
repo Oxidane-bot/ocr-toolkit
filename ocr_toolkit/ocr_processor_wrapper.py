@@ -2,7 +2,7 @@
 OCR Processor Wrapper that provides enhanced OCR processing capabilities.
 
 This wrapper provides a simplified interface for OCR processing using
-PaddleOCR-VL-1.5 for document structure analysis.
+OpenOCR OpenDoc-0.1B for document structure analysis.
 """
 
 import logging
@@ -17,7 +17,7 @@ class OCRProcessorWrapper:
     OCR Processor Wrapper that provides enhanced OCR processing capabilities.
 
     This wrapper provides a simplified interface for OCR processing using
-    PaddleOCR-VL-1.5 for document structure analysis.
+    OpenOCR OpenDoc-0.1B for document structure analysis.
     """
 
     def __init__(self, use_gpu: bool = True, with_images: bool = False):
@@ -32,15 +32,15 @@ class OCRProcessorWrapper:
         self.with_images = with_images
         self.logger = logging.getLogger(__name__)
 
-        # Initialize PaddleOCR-VL handler
+        # Initialize OpenOCR handler
         self._initialize_handler()
 
     def _initialize_handler(self):
-        """Initialize the PaddleOCR-VL handler."""
-        self.logger.info("Using PaddleOCR-VL-1.5 engine (0.9B VLM for document parsing)")
-        from .processors import PaddleOCRVLHandler
+        """Initialize the OpenOCR OpenDoc handler."""
+        self.logger.info("Using OpenOCR OpenDoc-0.1B engine for document parsing")
+        from .processors import OpenOCRDocHandler
 
-        self.handler = PaddleOCRVLHandler(use_gpu=self.use_gpu, with_images=self.with_images)
+        self.handler = OpenOCRDocHandler(use_gpu=self.use_gpu, with_images=self.with_images)
 
     def process_document(self, file_path: str, args=None) -> dict[str, Any]:
         """
@@ -61,7 +61,7 @@ class OCRProcessorWrapper:
             pages = getattr(args, "pages", None) if args else None
             profile = getattr(args, "profile", False) if args else False
 
-            # Use PaddleOCR-VL handler
+            # Use OpenOCR doc handler
             profiler = None
             if profile:
                 from .utils.profiling import Profiler
@@ -102,7 +102,7 @@ class OCRProcessorWrapper:
                 "file_path": file_path,
                 "file_name": os.path.basename(file_path),
                 "success": True,
-                "chosen_method": "paddleocr_vl",
+                "chosen_method": "openocr_doc",
                 "final_content": content,
                 "processing_time": processing_time,
                 "pages": metadata.get("page_count", 1),
@@ -128,7 +128,7 @@ class OCRProcessorWrapper:
                 "file_path": file_path,
                 "file_name": os.path.basename(file_path),
                 "success": False,
-                "chosen_method": "paddleocr_vl",
+                "chosen_method": "openocr_doc",
                 "final_content": "",
                 "processing_time": time.time() - start_time,
                 "pages": 0,

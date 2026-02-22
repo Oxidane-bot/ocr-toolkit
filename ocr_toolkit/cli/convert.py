@@ -21,7 +21,7 @@ warnings.filterwarnings("ignore", message="invalid value encountered in exp2")
 warnings.filterwarnings("ignore", message="invalid value encountered in log10")
 warnings.filterwarnings("ignore", message="invalid value encountered in nextafter")
 
-# Suppress PaddlePaddle/PaddleOCR API warnings
+# Suppress OCR backend API warnings
 warnings.filterwarnings("ignore", message=r"(?s)\s*Non compatible API\..*")
 warnings.filterwarnings("ignore", message=r"(?s)\s*To copy construct from a tensor.*")
 
@@ -38,8 +38,8 @@ from ..utils import (
     add_output_args,
     check_input_path_exists,
     configure_logging_level,
-    configure_paddle_environment,
-    configure_paddle_warnings,
+    configure_ocr_environment,
+    configure_ocr_warnings,
     discover_files,
     generate_file_tree,
     get_directory_cache,
@@ -173,9 +173,9 @@ def validate_arguments(args):
 
 def main():
     """Main entry point for ocr-convert command."""
-    # Configure PaddlePaddle environment before any imports
-    configure_paddle_environment()
-    configure_paddle_warnings()
+    # Configure OCR-related environment before any heavy imports
+    configure_ocr_environment()
+    configure_ocr_warnings()
 
     # Suppress verbose warnings from the pypdf library
     warnings.filterwarnings(
@@ -240,7 +240,6 @@ def main():
         ocr_args = Namespace(
             batch_size=1,  # Default batch size for compatibility
             cpu=args.cpu,
-            engine=getattr(args, "engine", "paddleocr"),
         )
 
         # Lazily load OCR model only if any file requires it.
@@ -266,8 +265,8 @@ def main():
 
         processor = None
         if needs_ocr_model:
-            # Verify PaddlePaddle installation
-            logging.info("Verifying PaddlePaddle installation...")
+            # Verify OpenOCR installation
+            logging.info("Verifying OpenOCR installation...")
             with suppress_external_library_output():
                 load_ocr_model(use_cpu=ocr_args.cpu)
 
@@ -328,7 +327,8 @@ def main():
             relative_path = file_relative_paths.get(file_path, os.path.basename(file_path))
 
             try:
-                # Enhanced logging for preserve structure mode - use print to avoid being drowned by PaddlePaddle stderr
+                # Enhanced logging for preserve structure mode - use print to avoid being drowned by runtime stderr
+                # when third-party OCR runtimes emit unexpected background logs.
                 if args.preserve_structure:
                     print(
                         f"Processing [{processed_count}/{len(files_to_process)}]: {file_path} -> {relative_path}"
