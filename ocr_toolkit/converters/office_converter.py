@@ -14,6 +14,7 @@ The module has been refactored following high-cohesion, low-coupling principles:
 
 import logging
 import os
+import platform
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,7 @@ from typing import Any
 from .strategies import (
     DocxToPdfStrategy,
     ExcelComStrategy,
+    LibreOfficeStrategy,
     PowerPointComStrategy,
     WordComStrategy,
 )
@@ -41,13 +43,36 @@ class OfficeConverter:
 
     def __init__(self):
         """Initialize converter with available strategies."""
-        self.strategies = [
-            DocxToPdfStrategy(),
-            WordComStrategy(),
-            PowerPointComStrategy(),
-            ExcelComStrategy(),
-        ]
+        self.strategies = []
         self.logger = logging.getLogger(__name__)
+        self._init_strategies()
+
+    def _init_strategies(self):
+        """Initialize strategies based on platform and available tools."""
+        is_linux = platform.system().lower() == "linux"
+        is_windows = platform.system().lower() == "windows"
+
+        # On Linux, prioritize LibreOffice if available
+        if is_linux:
+            libreoffice_strategy = LibreOfficeStrategy()
+            if libreoffice_strategy.is_available():
+                self.strategies.append(libreoffice_strategy)
+                self.logger.info("Using LibreOffice strategy for Office conversion on Linux")
+            else:
+                self.logger.warning("LibreOffice not found, Office conversion may not work properly on Linux")
+
+        # On Windows, use COM-based strategies
+        if is_windows:
+            self.strategies.extend([
+                DocxToPdfStrategy(),
+                WordComStrategy(),
+                PowerPointComStrategy(),
+                ExcelComStrategy(),
+            ])
+        else:
+            # On non-Windows platforms, still add docx2pdf for .docx files
+            # (it may work with Wine or other compatibility layers)
+            self.strategies.append(DocxToPdfStrategy())
 
     def convert_to_pdf(self, input_path: str, output_path: str) -> dict[str, Any]:
         """
@@ -66,8 +91,16 @@ class OfficeConverter:
         """
         ext = Path(input_path).suffix.lower()
 
-        # For .docx files, try docx2pdf first, then fall back to COM
-        if ext == ".docx":
+        # On Linux, try LibreOffice first if available
+        if platform.system().lower() == "linux":
+            libreoffice_strategy = next(
+                (s for s in self.strategies if isinstance(s, LibreOfficeStrategy)), None
+            )
+            if libreoffice_strategy and libreoffice_strategy.supports_format(ext):
+                return libreoffice_strategy.convert(input_path, output_path)
+
+        # For .docx files on Windows, try docx2pdf first, then fall back to COM
+        if ext == ".docx" and platform.system().lower() == "windows":
             return self._convert_docx_with_fallback(input_path, output_path)
 
         # For other formats, find the appropriate strategy
@@ -159,6 +192,8 @@ class OfficeConverter:
                 formats.update([".ppt", ".pptx"])
             elif isinstance(strategy, ExcelComStrategy):
                 formats.update([".xls", ".xlsx"])
+            elif isinstance(strategy, LibreOfficeStrategy):
+                formats.update(LibreOfficeStrategy.SUPPORTED_FORMATS)
 
         return sorted(formats)
 
