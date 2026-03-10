@@ -20,16 +20,23 @@ class OCRProcessorWrapper:
     OpenOCR OpenDoc-0.1B for document structure analysis.
     """
 
-    def __init__(self, use_gpu: bool = True, with_images: bool = False):
+    def __init__(
+        self,
+        use_gpu: bool = True,
+        with_images: bool = False,
+        max_parallel_blocks: int | None = None,
+    ):
         """
         Initialize the OCR processor wrapper.
 
         Args:
             use_gpu: Whether to use GPU for processing
             with_images: Whether to extract and save images with links
+            max_parallel_blocks: Optional max parallel blocks for OpenOCR
         """
         self.use_gpu = use_gpu
         self.with_images = with_images
+        self.max_parallel_blocks = max_parallel_blocks
         self.logger = logging.getLogger(__name__)
 
         # Initialize OpenOCR handler
@@ -40,7 +47,10 @@ class OCRProcessorWrapper:
         self.logger.info("Using OpenOCR OpenDoc-0.1B engine for document parsing")
         from .processors import OpenOCRDocHandler
 
-        self.handler = OpenOCRDocHandler(use_gpu=self.use_gpu, with_images=self.with_images)
+        handler_kwargs = {"use_gpu": self.use_gpu, "with_images": self.with_images}
+        if self.max_parallel_blocks is not None:
+            handler_kwargs["max_parallel_blocks"] = self.max_parallel_blocks
+        self.handler = OpenOCRDocHandler(**handler_kwargs)
 
     def process_document(self, file_path: str, args=None) -> dict[str, Any]:
         """
@@ -148,7 +158,7 @@ class OCRProcessorWrapper:
 
 
 def create_ocr_processor_wrapper(
-    use_gpu: bool = True, with_images: bool = False
+    use_gpu: bool = True, with_images: bool = False, max_parallel_blocks: int | None = None
 ) -> OCRProcessorWrapper:
     """
     Create an OCR processor wrapper instance.
@@ -156,8 +166,13 @@ def create_ocr_processor_wrapper(
     Args:
         use_gpu: Whether to use GPU for processing
         with_images: Whether to extract and save images with links
+        max_parallel_blocks: Optional max parallel blocks for OpenOCR
 
     Returns:
         OCRProcessorWrapper instance
     """
-    return OCRProcessorWrapper(use_gpu=use_gpu, with_images=with_images)
+    return OCRProcessorWrapper(
+        use_gpu=use_gpu,
+        with_images=with_images,
+        max_parallel_blocks=max_parallel_blocks,
+    )
