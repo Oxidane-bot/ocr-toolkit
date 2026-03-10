@@ -11,6 +11,7 @@ import os
 import sys
 import time
 import warnings
+from typing import Any
 
 # Suppress noisy NumPy warnings on Windows (especially with version 1.26.x)
 # Must be done before importing numpy or other libraries that use it
@@ -55,6 +56,12 @@ def _apply_threads_env(threads: int | None) -> None:
     if threads and threads > 0:
         os.environ["OMP_NUM_THREADS"] = str(threads)
         os.environ["MKL_NUM_THREADS"] = str(threads)
+
+
+def _save_output_file(output_file_path: str, content: str, dir_cache) -> None:
+    dir_cache.ensure_directory(os.path.dirname(output_file_path))
+    with open(output_file_path, "w", encoding="utf-8") as f:
+        f.write(content)
 
 
 def _determine_output_directory(args, base_dir: str) -> str:
@@ -115,6 +122,19 @@ Supported formats:
     )
 
     BaseArgumentParser.add_workers_argument(parser, default=config.DEFAULT_WORKERS)
+
+    parser.add_argument(
+        "--max-parallel-blocks",
+        type=int,
+        default=4,
+        help="OpenOCR max parallel blocks per worker (default: 4)",
+    )
+    parser.add_argument(
+        "--ocr-io-workers",
+        type=int,
+        default=2,
+        help="Background workers for writing OCR outputs (default: 2)",
+    )
 
     parser.add_argument(
         "--list-formats", action="store_true", help="List supported file formats and exit"
@@ -243,29 +263,23 @@ def main():
         )
 
         # Lazily load OCR model only if any file requires it.
-        model_required_exts = {
-            ".pdf",
-            ".jpg",
-            ".jpeg",
-            ".png",
-            ".bmp",
-            ".tiff",
-            ".tif",
-            ".gif",
-            ".doc",
-            ".docx",
-            ".ppt",
-            ".pptx",
-            ".xls",
-            ".xlsx",
-        }
+        ocr_required_exts = config.get_ocr_supported_formats()
         needs_ocr_model = any(
-            Path(p).suffix.lower() in model_required_exts for p in files_to_process
+            Path(p).suffix.lower() in ocr_required_exts for p in files_to_process
         )
+
+        ocr_parallel_exts = config.SUPPORTED_PDF_FORMATS | config.SUPPORTED_IMAGE_FORMATS
+        ocr_pool_candidates = [
+            p for p in files_to_process if Path(p).suffix.lower() in ocr_parallel_exts
+        ]
+
+        ocr_workers = 1
+        ocr_workers_reason = "single-process OCR pipeline"
+
+        needs_main_processor = needs_ocr_model
 
         processor = None
         if needs_ocr_model:
-            # Verify OpenOCR installation
             logging.info("Verifying OpenOCR installation...")
             with suppress_external_library_output():
                 load_ocr_model(use_cpu=ocr_args.cpu)
@@ -273,11 +287,18 @@ def main():
             # Import lazily to avoid pulling in heavy OCR deps on non-OCR workloads.
             from .. import ocr_processor_wrapper
 
-            processor = ocr_processor_wrapper.create_ocr_processor_wrapper(
-                use_gpu=not ocr_args.cpu, with_images=getattr(args, "with_images", False)
-            )
+            if needs_main_processor:
+                processor = ocr_processor_wrapper.create_ocr_processor_wrapper(
+                    use_gpu=not ocr_args.cpu,
+                    with_images=getattr(args, "with_images", False),
+                    max_parallel_blocks=getattr(args, "max_parallel_blocks", None),
+                )
         else:
             logging.info("No OCR-required formats detected; skipping OCR model load.")
+
+        if ocr_pool_candidates:
+            logging.info(f"OCR workers: {ocr_workers} ({ocr_workers_reason})")
+            logging.info("OCR pipeline enabled (single-process inference + async writes)")
 
         # Get directory cache for optimized directory creation
         dir_cache = get_directory_cache()
@@ -315,16 +336,36 @@ def main():
             p for p in files_to_process if Path(p).suffix.lower() in parallel_safe_exts
         }
         parallel_files = [p for p in files_to_process if p in parallel_file_set]
+        ocr_pool_files = []
         serial_files = [p for p in files_to_process if p not in parallel_file_set]
 
         if args.workers > 1 and parallel_files:
             logging.info(
-                f"Using {args.workers} workers for text/Excel files; other formats processed serially for GPU/Office safety."
+                "Using %d workers for text/Excel files; other formats processed serially for GPU/Office safety.",
+                args.workers,
             )
 
-        def process_and_save(file_path: str) -> tuple[dict, int]:
-            processed_count = file_index.get(file_path, 0)
+        write_executor = None
+        write_futures: list[tuple[Any, dict[str, Any], str]] = []
+        ocr_io_workers = max(int(getattr(args, "ocr_io_workers", 2)), 1)
+        if ocr_pool_candidates:
+            write_executor = ThreadPoolExecutor(max_workers=ocr_io_workers)
+
+        def _get_output_paths(file_path: str) -> tuple[str, str, str]:
             relative_path = file_relative_paths.get(file_path, os.path.basename(file_path))
+            output_file_path = get_output_file_path(
+                file_path,
+                args.output_dir,
+                preserve_structure=args.preserve_structure,
+                relative_path=relative_path,
+                base_dir=base_dir,
+            )
+            output_dir = os.path.dirname(output_file_path)
+            return relative_path, output_file_path, output_dir
+
+        def process_and_save(file_path: str, *, async_write: bool = False) -> tuple[dict, int]:
+            processed_count = file_index.get(file_path, 0)
+            relative_path, output_file_path, output_dir = _get_output_paths(file_path)
 
             try:
                 # Enhanced logging for preserve structure mode - use print to avoid being drowned by runtime stderr
@@ -338,17 +379,7 @@ def main():
 
                 ext = Path(file_path).suffix.lower()
 
-                if processor is not None:
-                    # Calculate output directory for this file (needed for image extraction)
-                    output_file_path = get_output_file_path(
-                        file_path,
-                        args.output_dir,
-                        preserve_structure=args.preserve_structure,
-                        relative_path=relative_path,
-                        base_dir=base_dir,
-                    )
-                    output_dir = os.path.dirname(output_file_path)
-
+                if processor is not None and ext not in parallel_safe_exts:
                     # Add output directory to args for image extraction
                     args._output_dir = output_dir
 
@@ -419,27 +450,26 @@ def main():
                     pages = 1 if result.get("success") else 0
 
                 # Save the result with error handling
-                try:
-                    output_file_path = get_output_file_path(
-                        file_path,
-                        args.output_dir,
-                        preserve_structure=args.preserve_structure,
-                        relative_path=relative_path,
-                        base_dir=base_dir,
+                if async_write and write_executor:
+                    future = write_executor.submit(
+                        _save_output_file,
+                        output_file_path,
+                        result.get("final_content", ""),
+                        dir_cache,
                     )
-
-                    # Use cached directory creation
-                    dir_cache.ensure_directory(os.path.dirname(output_file_path))
-
-                    with open(output_file_path, "w", encoding="utf-8") as f:
-                        f.write(result.get("final_content", ""))
-
-                    logging.debug(f"Saved output to: {output_file_path}")
-
-                except OSError as e:
-                    logging.error(f"Failed to save output file for {file_path}: {e}")
-                    result["success"] = False
-                    result["error"] = f"File save error: {e}"
+                    write_futures.append((future, result, file_path))
+                else:
+                    try:
+                        _save_output_file(
+                            output_file_path,
+                            result.get("final_content", ""),
+                            dir_cache,
+                        )
+                        logging.debug(f"Saved output to: {output_file_path}")
+                    except OSError as e:
+                        logging.error(f"Failed to save output file for {file_path}: {e}")
+                        result["success"] = False
+                        result["error"] = f"File save error: {e}"
 
                 status = "SUCCESS" if result.get("success") else "FAILED"
                 method = result.get("chosen_method", "none")
@@ -484,28 +514,41 @@ def main():
                 }
                 return error_result, 0
 
-        futures = []
         if args.workers > 1 and parallel_files:
             with ThreadPoolExecutor(max_workers=args.workers) as executor:
-                futures = [
-                    executor.submit(process_and_save, file_path) for file_path in parallel_files
+                text_futures = [
+                    executor.submit(process_and_save, file_path)
+                    for file_path in parallel_files
                 ]
 
                 # Process OCR/Office-heavy formats serially in main thread while workers handle safe formats.
                 for file_path in serial_files:
-                    result, pages = process_and_save(file_path)
+                    result, pages = process_and_save(
+                        file_path, async_write=bool(write_executor)
+                    )
                     results.append(result)
                     total_pages += pages
 
-                for future in as_completed(futures):
+                for future in as_completed(text_futures):
                     result, pages = future.result()
                     results.append(result)
                     total_pages += pages
         else:
             for file_path in files_to_process:
-                result, pages = process_and_save(file_path)
+                result, pages = process_and_save(file_path, async_write=bool(write_executor))
                 results.append(result)
                 total_pages += pages
+
+        for future, result, file_path in write_futures:
+            try:
+                future.result()
+            except Exception as e:
+                logging.error(f"Async write failed for {file_path}: {e}")
+                result["success"] = False
+                result["error"] = f"File save error: {e}"
+
+        if write_executor:
+            write_executor.shutdown(wait=True)
 
         # Display results summary
         print("\n" + "=" * 60)
@@ -527,20 +570,32 @@ def main():
         total_conversion_time = conversion_end_time - conversion_start_time
 
         # In parallel mode, per-file processing times overlap; use a critical-path estimate.
+        parallel_set = set(parallel_files)
+        ocr_parallel_set = set(ocr_pool_files)
+        serial_set = set(serial_files)
+
         used_parallel = args.workers > 1 and bool(parallel_files)
         if used_parallel:
             serial_processing_time = sum(
                 r.get("processing_time", 0)
                 for r in results
-                if Path(r.get("file_path", "")).suffix.lower() not in parallel_safe_exts
+                if r.get("file_path", "") in serial_set
             )
-            parallel_processing_times = [
+            text_parallel_times = [
                 r.get("processing_time", 0)
                 for r in results
-                if Path(r.get("file_path", "")).suffix.lower() in parallel_safe_exts
+                if r.get("file_path", "") in parallel_set
             ]
-            parallel_max_processing_time = max(parallel_processing_times, default=0)
-            effective_processing_time = max(serial_processing_time, parallel_max_processing_time)
+            ocr_parallel_times = [
+                r.get("processing_time", 0)
+                for r in results
+                if r.get("file_path", "") in ocr_parallel_set
+            ]
+            effective_processing_time = max(
+                serial_processing_time,
+                max(text_parallel_times, default=0),
+                max(ocr_parallel_times, default=0),
+            )
         else:
             effective_processing_time = sum_processing_time
 

@@ -79,6 +79,12 @@ uv tool install --python 3.12 .
 
 **Windows users**: Microsoft Office recommended for best DOCX/PPTX support.
 
+**Linux users**: Install LibreOffice (`soffice`) for Office document conversion:
+- Debian/Ubuntu (desktop): `sudo apt-get install libreoffice`
+- Debian/Ubuntu (headless/CI): `sudo apt-get install libreoffice-nogui`
+- If you see `X11 error: Can't open display`, install `-nogui` packages or run via `xvfb-run` (`sudo apt-get install xvfb`)
+- For better CJK rendering: `sudo apt-get install fonts-noto-cjk`
+
 ## 🎯 Quick Start
 
 ### Convert Documents (Recommended)

@@ -78,6 +78,12 @@ uv tool install --python 3.12 .
 
 **Windows用户**: 建议安装Microsoft Office以获得最佳DOCX/PPTX支持。
 
+**Linux用户**: 需要安装 LibreOffice (`soffice`) 以支持Office文档转换:
+- Debian/Ubuntu (桌面版): `sudo apt-get install libreoffice`
+- Debian/Ubuntu (无头/CI): `sudo apt-get install libreoffice-nogui`
+- 如果遇到 `X11 error: Can't open display`，请安装 `-nogui` 包或通过 `xvfb-run` 运行 (`sudo apt-get install xvfb`)
+- 为了更好的中日韩字符渲染: `sudo apt-get install fonts-noto-cjk`
+
 ## 🎯 快速开始
 
 ### 转换文档 (推荐)

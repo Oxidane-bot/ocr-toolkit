@@ -4,13 +4,26 @@ COM application manager for Office converters.
 This module provides singleton COM application instances to avoid
 repeatedly opening and closing Office applications (Word, Excel, PowerPoint)
 which causes window flickering and performance degradation.
+
+This module is only available on Windows platforms.
 """
 
 import atexit
 import logging
+import platform
 from typing import Any
 
-import pythoncom
+# Only import pythoncom on Windows
+if platform.system().lower() == "windows":
+    import pythoncom
+else:
+    # Create a dummy module for non-Windows platforms
+    class DummyPythonCom:
+        @staticmethod
+        def CoInitialize():
+            pass
+
+    pythoncom = DummyPythonCom()
 
 
 class ComApplicationManager:
@@ -41,6 +54,10 @@ class ComApplicationManager:
         self._excel_app = None
         self._powerpoint_app = None
         self._initialized = True
+        self._is_windows = platform.system().lower() == "windows"
+
+        if not self._is_windows:
+            self.logger.debug("COM manager initialized on non-Windows platform (COM operations will not be available)")
 
         # Register cleanup on exit
         atexit.register(self.cleanup_all)
@@ -51,7 +68,13 @@ class ComApplicationManager:
 
         Returns:
             Word application COM object
+
+        Raises:
+            RuntimeError: If not on Windows platform
         """
+        if not self._is_windows:
+            raise RuntimeError("Word COM automation is only available on Windows")
+
         # Initialize COM for this thread
         pythoncom.CoInitialize()
 
@@ -86,7 +109,13 @@ class ComApplicationManager:
 
         Returns:
             Excel application COM object
+
+        Raises:
+            RuntimeError: If not on Windows platform
         """
+        if not self._is_windows:
+            raise RuntimeError("Excel COM automation is only available on Windows")
+
         # Initialize COM for this thread
         pythoncom.CoInitialize()
 
@@ -121,7 +150,13 @@ class ComApplicationManager:
 
         Returns:
             PowerPoint application COM object
+
+        Raises:
+            RuntimeError: If not on Windows platform
         """
+        if not self._is_windows:
+            raise RuntimeError("PowerPoint COM automation is only available on Windows")
+
         # Initialize COM for this thread
         pythoncom.CoInitialize()
 
